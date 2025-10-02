@@ -1,0 +1,103 @@
+'use client'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { 
+  UserPlus, 
+  Calculator, 
+  FileText, 
+  Download,
+  Settings,
+  BarChart3
+} from 'lucide-react'
+
+interface QuickActionsProps {
+  onAddEmployee: () => void
+  onRunPayroll: () => void
+  onViewPayslips: () => void
+  onDownloadReports: () => void
+  onViewSettings: () => void
+  onViewReports: () => void
+}
+
+export default function QuickActions({ 
+  onAddEmployee,
+  onRunPayroll,
+  onViewPayslips,
+  onDownloadReports,
+  onViewSettings,
+  onViewReports
+}: QuickActionsProps) {
+  const actions = [
+    {
+      title: 'Add Employee',
+      icon: UserPlus,
+      color: 'bg-blue-500 hover:bg-blue-600',
+      onClick: onAddEmployee
+    },
+    {
+      title: 'Run Payroll',
+      icon: Calculator,
+      color: 'bg-green-500 hover:bg-green-600',
+      onClick: onRunPayroll
+    },
+    {
+      title: 'View Payslips',
+      
+      icon: FileText,
+      color: 'bg-purple-500 hover:bg-purple-600',
+      onClick: onViewPayslips
+    },
+    {
+      title: 'Reports',
+      
+      icon: Download,
+      color: 'bg-orange-500 hover:bg-orange-600',
+      onClick: onDownloadReports
+    },
+    {
+      title: 'View Reports',
+     
+      icon: BarChart3,
+      color: 'bg-indigo-500 hover:bg-indigo-600',
+      onClick: onViewReports
+    },
+    {
+      title: 'Settings',
+      icon: Settings,
+      color: 'bg-gray-500 hover:bg-gray-600',
+      onClick: onViewSettings
+    }
+  ]
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {actions.map((action, index) => {
+            const Icon = action.icon
+            return (
+              <Button
+                key={index}
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
+                onClick={action.onClick}
+              >
+                <div className={`p-2 rounded-lg ${action.color} text-white`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div className="text-center">
+                  <p className="font-medium text-sm">{action.title}</p>
+                  <p className="text-xs text-muted-foreground">{action.description}</p>
+                </div>
+              </Button>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

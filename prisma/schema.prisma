@@ -1,0 +1,380 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id String @id @default(cuid())
+
+  // Personal Information
+  name           String
+  kraPin         String  @unique // KRA PIN (A123456789Z format)
+  nationalId     String  @unique // National ID (8 digits)
+  employeeNumber String? @unique // Optional employee number
+
+  // Employment Details
+  basicSalary  Float // Monthly basic salary in KSh
+  allowances   Float        @default(0) // Monthly allowances in KSh
+  startDate    DateTime // Employment start date
+  contractType ContractType @default(PERMANENT)
+  isActive     Boolean      @default(true)
+
+  // Bank Details
+  bankName    String
+  bankBranch  String
+  bankAccount String
+  swiftCode   String?
+
+  // Contact Information (optional for MVP)
+  email       String?
+  phoneNumber String?
+  address     String?
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  payrollRuns       PayrollRun[]
+  salaryAdjustments SalaryAdjustment[]
+  deductions        CustomDeduction[]
+  bonuses           Bonus[]
+  insurancePremiums InsurancePremium[]
+
+  @@map("employees")
+}
+
+model PayrollRun {
+  id         String @id @default(cuid())
+  employeeId String
+  monthYear  String // Format: YYYY-MM
+
+  // Earnings Breakdown
+  basicSalary Float // Basic salary for the month
+  allowances  Float // Allowances for the month
+  overtime    Float @default(0) // Overtime earnings
+  bonuses     Float @default(0) // Bonus payments
+  grossPay    Float // Total gross pay
+
+  // Overtime Details
+  overtimeHours Float        @default(0)
+  overtimeType  OvertimeType @default(WEEKDAY)
+
+  // Bonus Details (added from old schema)
+  bonusDescription String? // Description of bonus payment
+
+  // Unpaid Leave
+  unpaidDays      Int   @default(0)
+  unpaidDeduction Float @default(0)
+
+  // Statutory Deductions
+  paye        Float @default(0) // PAYE tax
+  nssf        Float @default(0) // NSSF employee contribution
+  shif        Float @default(0) // SHIF employee contribution
+  housingLevy Float @default(0) // Housing levy employee contribution
+
+  // Tax Calculation (added from old schema)
+  taxableIncome Float @default(0) // Taxable income after allowable deductions
+
+  // Custom Deductions
+  customDeductions Float @default(0) // Total custom deductions
+
+  // Totals
+  totalDeductions Float // Total of all deductions
+  netPay          Float // Final net pay
+
+  // Additional Calculation Data (JSON for flexibility)
+  deductions   Json? // Detailed deduction breakdown
+  earnings     Json? // Detailed earnings breakdown
+  calculations Json? // Calculation metadata (rates, working days, etc.)
+
+  // Processing Information
+  processedAt DateTime      @default(now())
+  processedBy String? // For future user authentication
+  status      PayrollStatus @default(PROCESSED)
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // Unique constraint: one payroll run per employee per month
+  @@unique([employeeId, monthYear])
+  @@map("payroll_runs")
+}
+
+model SalaryAdjustment {
+  id         String @id @default(cuid())
+  employeeId String
+
+  // Previous Salary Details
+  previousBasicSalary Float
+  previousAllowances  Float
+
+  // New Salary Details
+  newBasicSalary Float
+  newAllowances  Float
+
+  // Adjustment Details
+  effectiveDate  DateTime
+  reason         String
+  adjustmentType AdjustmentType
+  approvedBy     String? // For future user authentication
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("salary_adjustments")
+}
+
+model CustomDeduction {
+  id         String @id @default(cuid())
+  employeeId String
+
+  // Deduction Details
+  amount      Float
+  description String
+  type        DeductionType
+
+  // Recurrence Settings
+  isRecurring Boolean @default(false)
+  startMonth  String? // YYYY-MM format
+  endMonth    String? // YYYY-MM format
+  isActive    Boolean @default(true)
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("custom_deductions")
+}
+
+model Bonus {
+  id         String @id @default(cuid())
+  employeeId String
+
+  // Bonus Details
+  amount       Float
+  description  String
+  type         BonusType
+  paymentMonth String // YYYY-MM format
+
+  // Tax Settings
+  isTaxable   Boolean @default(true)
+  isProcessed Boolean @default(false)
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("bonuses")
+}
+
+model InsurancePremium {
+  id         String @id @default(cuid())
+  employeeId String
+
+  // Insurance Details
+  insuranceType String // e.g., "Health", "Life", "Personal Accident"
+  provider      String // Insurance company name
+  policyNumber  String?
+
+  // Premium Details
+  monthlyPremium Float // Monthly premium amount in KSh
+  employeeShare  Float // Employee's contribution
+  employerShare  Float // Employer's contribution
+
+  // Coverage Period
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+
+  // Tax Relief (for NITA relief purposes)
+  isTaxRelief Boolean @default(false) // If eligible for tax relief
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("insurance_premiums")
+}
+
+model PayrollBatch {
+  id String @id @default(cuid())
+
+  // Personal Information
+  name           String
+  kraPin         String  @unique // KRA PIN (A123456789Z format)
+  nationalId     String  @unique // National ID (8 digits)
+  employeeNumber String? @unique // Optional employee number
+
+  // Batch Details
+  monthYear      String // YYYY-MM format
+  totalEmployees Int
+  successfulRuns Int
+  failedRuns     Int
+
+  // Processing Information
+  startedAt   DateTime    @default(now())
+  completedAt DateTime?
+  processedBy String? // For future user authentication
+  status      BatchStatus @default(PROCESSING)
+
+  // Error Tracking
+  errors Json? // Array of error details
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payroll_batches")
+}
+
+model TaxRate {
+  id String @id @default(cuid())
+
+  // Rate Details
+  name     String // e.g., "PAYE", "NSSF", "SHIF", "Housing Levy"
+  rateType RateType
+  value    Float // Rate value (percentage or fixed amount)
+
+  // Applicable Period
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  // Additional Configuration (JSON for flexibility)
+  configuration Json? // Bands, limits, exemptions, etc.
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tax_rates")
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  // Action Details
+  action     String // e.g., "CREATE_EMPLOYEE", "RUN_PAYROLL", "UPDATE_SALARY"
+  entityType String // e.g., "Employee", "PayrollRun"
+  entityId   String
+
+  // User Information (for future authentication)
+  userId    String?
+  userEmail String?
+
+  // Change Details
+  oldValues Json? // Previous values
+  newValues Json? // New values
+
+  // Metadata
+  ipAddress String?
+  userAgent String?
+
+  // Audit Fields
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// Enums
+enum ContractType {
+  PERMANENT
+  CONTRACT
+  CASUAL
+  INTERN
+
+  @@map("contract_type")
+}
+
+enum OvertimeType {
+  WEEKDAY
+  HOLIDAY
+
+  @@map("overtime_type")
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSING
+  PROCESSED
+  APPROVED
+  PAID
+  CANCELLED
+
+  @@map("payroll_status")
+}
+
+enum BatchStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("batch_status")
+}
+
+enum AdjustmentType {
+  PROMOTION
+  INCREMENT
+  MARKET_ADJUSTMENT
+  COST_OF_LIVING
+  DEMOTION
+  OTHER
+
+  @@map("adjustment_type")
+}
+
+enum DeductionType {
+  LOAN
+  ADVANCE
+  SACCO
+  INSURANCE
+  WELFARE
+  UNION_DUES
+  OTHER
+
+  @@map("deduction_type")
+}
+
+enum BonusType {
+  PERFORMANCE
+  ANNUAL
+  COMMISSION
+  OVERTIME_BONUS
+  HOLIDAY_BONUS
+  PROJECT_BONUS
+  OTHER
+
+  @@map("bonus_type")
+}
+
+enum RateType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  TIERED
+
+  @@map("rate_type")
+}
