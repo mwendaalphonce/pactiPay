@@ -11,9 +11,21 @@ const runPayrollSchema = z.object({
   overtimeType: z.enum(['weekday', 'holiday']).default('weekday'),
   unpaidDays: z.number().min(0).max(31).default(0),
   customDeductions: z.number().min(0).default(0),
-  customDeductionDescription: z.string().optional(),
+  customDeductionDescription: z.string().optional().nullable(),
   bonuses: z.number().min(0).default(0),
-  bonusDescription: z.string().optional()
+  bonusDescription: z.string().optional().nullable(),
+  // Accept pre-calculated values from frontend
+  basicSalary: z.number().optional(),
+  allowances: z.number().optional(),
+  overtime: z.number().optional(),
+  grossPay: z.number().optional(),
+  nssf: z.number().optional(),
+  shif: z.number().optional(),
+  housingLevy: z.number().optional(),
+  taxableIncome: z.number().optional(),
+  paye: z.number().optional(),
+  totalDeductions: z.number().optional(),
+  netPay: z.number().optional()
 })
 
 const batchPayrollSchema = z.object({
@@ -107,10 +119,23 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error running payroll:', error)
+    
+    // Better error handling for validation errors
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Invalid payroll data',
+          details: error.errors
+        },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to run payroll' 
+        error: error instanceof Error ? error.message : 'Failed to run payroll'
       },
       { status: 500 }
     )
@@ -153,42 +178,68 @@ async function processSinglePayroll(data: any) {
     )
   }
   
-  // Calculate payroll
-  const payrollCalculation = calculatePayroll({
-    employee,
-    overtimeHours: validatedData.overtimeHours,
-    overtimeType: validatedData.overtimeType,
-    unpaidDays: validatedData.unpaidDays,
-    customDeductions: validatedData.customDeductions,
-    bonuses: validatedData.bonuses
-  })
+  // Use pre-calculated values if provided, otherwise calculate
+  let payrollData
+  if (validatedData.netPay !== undefined && validatedData.grossPay !== undefined) {
+    // Use pre-calculated values from frontend
+    payrollData = {
+      earnings: {
+        basicSalary: validatedData.basicSalary!,
+        allowances: validatedData.allowances!,
+        overtime: validatedData.overtime!,
+        grossPay: validatedData.grossPay!
+      },
+      deductions: {
+        paye: validatedData.paye!,
+        nssf: validatedData.nssf!,
+        shif: validatedData.shif!,
+        housingLevy: validatedData.housingLevy!,
+        customDeductions: validatedData.customDeductions,
+        taxableIncome: validatedData.taxableIncome!,
+        totalStatutory: (validatedData.paye! + validatedData.nssf! + validatedData.shif! + validatedData.housingLevy!),
+        totalDeductions: validatedData.totalDeductions!
+      },
+      netPay: validatedData.netPay!
+    }
+  } else {
+    // Calculate payroll on backend
+    const calculation = calculatePayroll({
+      employee,
+      overtimeHours: validatedData.overtimeHours,
+      overtimeType: validatedData.overtimeType,
+      unpaidDays: validatedData.unpaidDays,
+      customDeductions: validatedData.customDeductions,
+      bonuses: validatedData.bonuses
+    })
+    payrollData = calculation
+  }
   
   // Save payroll run
   const payrollRun = await prisma.payrollRun.create({
     data: {
       employeeId: validatedData.employeeId,
       monthYear: validatedData.monthYear,
-      basicSalary: employee.basicSalary,
-      allowances: employee.allowances,
-      overtime: payrollCalculation.earnings.overtime,
+      basicSalary: payrollData.earnings.basicSalary,
+      allowances: payrollData.earnings.allowances,
+      overtime: payrollData.earnings.overtime,
       bonuses: validatedData.bonuses,
-      grossPay: payrollCalculation.earnings.grossPay,
-      paye: payrollCalculation.deductions.paye,
-      nssf: payrollCalculation.deductions.nssf,
-      shif: payrollCalculation.deductions.shif,
-      housingLevy: payrollCalculation.deductions.housingLevy,
+      grossPay: payrollData.earnings.grossPay,
+      paye: payrollData.deductions.paye,
+      nssf: payrollData.deductions.nssf,
+      shif: payrollData.deductions.shif,
+      housingLevy: payrollData.deductions.housingLevy,
       customDeductions: validatedData.customDeductions,
-      totalDeductions: payrollCalculation.deductions.totalDeductions,
-      netPay: payrollCalculation.netPay,
+      totalDeductions: payrollData.deductions.totalDeductions,
+      netPay: payrollData.netPay,
       deductions: {
-        paye: payrollCalculation.deductions.paye,
-        nssf: payrollCalculation.deductions.nssf,
-        shif: payrollCalculation.deductions.shif,
-        housingLevy: payrollCalculation.deductions.housingLevy,
+        paye: payrollData.deductions.paye,
+        nssf: payrollData.deductions.nssf,
+        shif: payrollData.deductions.shif,
+        housingLevy: payrollData.deductions.housingLevy,
         customDeductions: validatedData.customDeductions,
         customDeductionDescription: validatedData.customDeductionDescription || null,
-        totalStatutory: payrollCalculation.deductions.totalStatutory,
-        totalDeductions: payrollCalculation.deductions.totalDeductions
+        totalStatutory: payrollData.deductions.totalStatutory,
+        totalDeductions: payrollData.deductions.totalDeductions
       }
     },
     include: {
@@ -299,9 +350,10 @@ async function processBatchPayroll(data: any) {
       
       results.push(payrollRun)
     } catch (error) {
+      console.error(`Error processing payroll for employee ${employeeData.employeeId}:`, error)
       errors.push({
         employeeId: employeeData.employeeId,
-        error: 'Failed to process payroll'
+        error: error instanceof Error ? error.message : 'Failed to process payroll'
       })
     }
   }

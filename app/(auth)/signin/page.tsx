@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 export default function SignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard'
+  const callbackUrl = searchParams?.get('callbackUrl') || '/onboarding/success'
   const error = searchParams?.get('error')
 
   const [isLoading, setIsLoading] = useState(false)

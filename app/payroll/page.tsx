@@ -83,7 +83,6 @@ export default function PayrollPage() {
   const handleCalculatePayroll = (result: PayrollCalculationResult) => {
     // This is called when calculation is done in the component
     // Just for preview - no need to do anything here unless you want to track it
-    console.log('Payroll calculated:', result)
   }
 
   const handleSavePayroll = async (saveData: any) => {
