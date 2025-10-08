@@ -1,8 +1,10 @@
 // src/app/api/employees/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
-import { employeeSchema } from '@/app/lib/validations' 
+import { prisma } from '@/lib/prisma'
+import { employeeSchema } from '@/lib/validations' 
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 
 // GET - Fetch all employees or filter by query params
@@ -56,8 +58,25 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Create a new employee
+// POST - Create a new employee
 export async function POST(request: NextRequest) {
   try {
+    // Get the authenticated user's session
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+          message: 'You must be associated with a company to create employees'
+        },
+        { status: 401 }
+      )
+    }
+    
+    const companyId = session.user.companyId
+    
     const body = await request.json()
     
     // Validate the input data
@@ -65,7 +84,12 @@ export async function POST(request: NextRequest) {
     
     // Check for duplicate KRA PIN
     const existingKraPin = await prisma.employee.findUnique({
-      where: { kraPin: validatedData.kraPin.toUpperCase() }
+      where: { 
+        companyId_kraPin: {
+          companyId: companyId,
+          kraPin: validatedData.kraPin.toUpperCase()
+        }
+      }
     })
     
     if (existingKraPin) {
@@ -73,7 +97,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Duplicate KRA PIN',
-          message: 'An employee with this KRA PIN already exists'
+          message: 'An employee with this KRA PIN already exists in your company'
         },
         { status: 409 }
       )
@@ -81,7 +105,12 @@ export async function POST(request: NextRequest) {
     
     // Check for duplicate National ID
     const existingNationalId = await prisma.employee.findUnique({
-      where: { nationalId: validatedData.nationalId }
+      where: { 
+        companyId_nationalId: {
+          companyId: companyId,
+          nationalId: validatedData.nationalId
+        }
+      }
     })
     
     if (existingNationalId) {
@@ -89,7 +118,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Duplicate National ID',
-          message: 'An employee with this National ID already exists'
+          message: 'An employee with this National ID already exists in your company'
         },
         { status: 409 }
       )
@@ -98,7 +127,12 @@ export async function POST(request: NextRequest) {
     // Check for duplicate Employee Number if provided
     if (validatedData.employeeNumber) {
       const existingEmployeeNumber = await prisma.employee.findUnique({
-        where: { employeeNumber: validatedData.employeeNumber }
+        where: { 
+          companyId_employeeNumber: {
+            companyId: companyId,
+            employeeNumber: validatedData.employeeNumber
+          }
+        }
       })
       
       if (existingEmployeeNumber) {
@@ -106,24 +140,17 @@ export async function POST(request: NextRequest) {
           {
             success: false,
             error: 'Duplicate Employee Number',
-            message: 'An employee with this Employee Number already exists'
+            message: 'An employee with this Employee Number already exists in your company'
           },
           { status: 409 }
         )
       }
     }
     
-    // Map contract type to match Prisma enum
-    const contractTypeMap: Record<string, string> = {
-      'permanent': 'PERMANENT',
-      'contract': 'CONTRACT',
-      'casual': 'CASUAL',
-      'intern': 'INTERN'
-    }
-    
     // Create the employee
     const employee = await prisma.employee.create({
       data: {
+        companyId: companyId,
         name: validatedData.name,
         kraPin: validatedData.kraPin.toUpperCase(),
         nationalId: validatedData.nationalId,
@@ -145,6 +172,8 @@ export async function POST(request: NextRequest) {
         action: 'CREATE_EMPLOYEE',
         entityType: 'Employee',
         entityId: employee.id,
+        userId: session.user.id,
+        userEmail: session.user.email || undefined,
         newValues: employee
       }
     })
@@ -184,6 +213,7 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT - Update an existing employee
+// PUT - Update an existing employee
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
@@ -216,7 +246,7 @@ export async function PUT(request: NextRequest) {
       )
     }
     
-    // Validate the update data
+    // Validate the update data (now isActive is in the schema)
     const validatedData = employeeSchema.partial().parse(updateData)
     
     // Check for duplicate KRA PIN (if being updated)
@@ -261,17 +291,8 @@ export async function PUT(request: NextRequest) {
       }
     }
     
-    // Map contract type if provided
-    let mappedContractType
-    if (validatedData.contractType) {
-      const contractTypeMap: Record<string, string> = {
-        'permanent': 'PERMANENT',
-        'contract': 'CONTRACT',
-        'casual': 'CASUAL',
-        'intern': 'INTERN'
-      }
-      mappedContractType = contractTypeMap[validatedData.contractType] as any
-    }
+    // Contract type is already transformed by the schema
+    const mappedContractType = validatedData.contractType
     
     // If salary is being changed, create a salary adjustment record
     if (
@@ -292,19 +313,22 @@ export async function PUT(request: NextRequest) {
       })
     }
     
-    // Prepare update data
+    // Prepare update data - only include fields that were actually sent
     const updatePayload: any = {}
-    if (validatedData.name) updatePayload.name = validatedData.name
-    if (validatedData.kraPin) updatePayload.kraPin = validatedData.kraPin.toUpperCase()
-    if (validatedData.nationalId) updatePayload.nationalId = validatedData.nationalId
-    if (validatedData.employeeNumber !== undefined) updatePayload.employeeNumber = validatedData.employeeNumber
-    if (validatedData.bankName) updatePayload.bankName = validatedData.bankName
-    if (validatedData.bankBranch) updatePayload.bankBranch = validatedData.bankBranch
-    if (validatedData.bankAccount) updatePayload.bankAccount = validatedData.bankAccount
-    if (validatedData.basicSalary) updatePayload.basicSalary = validatedData.basicSalary
+    if (validatedData.name !== undefined) updatePayload.name = validatedData.name
+    if (validatedData.kraPin !== undefined) updatePayload.kraPin = validatedData.kraPin.toUpperCase()
+    if (validatedData.nationalId !== undefined) updatePayload.nationalId = validatedData.nationalId
+    if (validatedData.employeeNumber !== undefined && validatedData.employeeNumber !== null) {
+      updatePayload.employeeNumber = validatedData.employeeNumber
+    }
+    if (validatedData.bankName !== undefined) updatePayload.bankName = validatedData.bankName
+    if (validatedData.bankBranch !== undefined) updatePayload.bankBranch = validatedData.bankBranch
+    if (validatedData.bankAccount !== undefined) updatePayload.bankAccount = validatedData.bankAccount
+    if (validatedData.basicSalary !== undefined) updatePayload.basicSalary = validatedData.basicSalary
     if (validatedData.allowances !== undefined) updatePayload.allowances = validatedData.allowances
-    if (validatedData.startDate) updatePayload.startDate = validatedData.startDate
-    if (mappedContractType) updatePayload.contractType = mappedContractType
+    if (validatedData.startDate !== undefined) updatePayload.startDate = validatedData.startDate
+    if (mappedContractType !== undefined) updatePayload.contractType = mappedContractType
+    if (validatedData.isActive !== undefined) updatePayload.isActive = validatedData.isActive
     
     // Update the employee
     const updatedEmployee = await prisma.employee.update({

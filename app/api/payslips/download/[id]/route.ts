@@ -1,7 +1,7 @@
 // src/app/api/payslips/download/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
-import { generatePayslipPDF } from '@/lib/pdf/payslip-generator'
+import { prisma } from '@/lib/prisma'
+import { generatePayslipPDF } from '@/pdf/payslip-generator'
 
 // GET /api/payslips/download/[id] - Download payslip as PDF
 export async function GET(

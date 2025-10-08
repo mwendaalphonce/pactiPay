@@ -1,105 +1,209 @@
+
 export interface Employee {
   id: string
   name: string
   kraPin: string
   nationalId: string
+  employeeNumber?: string
   bankName: string
   bankBranch: string
   bankAccount: string
+  swiftCode?: string
   basicSalary: number
   allowances: number
-  startDate: string
-  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL'
+  startDate: string | Date
+  contractType: 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'
   isActive: boolean
-  createdAt: string
-  updatedAt: string
+  email?: string
+  phoneNumber?: string
+  address?: string
+  createdAt: string | Date
+  updatedAt: string | Date
+  isDisabled?: boolean
+  insurancePremiums?: InsurancePremium
+}
+
+export interface InsurancePremium {
+  id?: string
+  lifeInsurance?: number
+  educationPolicy?: number
+  healthInsurance?: number
 }
 
 export interface PayrollRun {
   id: string
-  monthYear: string
   employeeId: string
   employee?: Employee
-  workingDays: number
-  actualDays: number
-  overtimeHours: number
-  holidayHours: number
-  basicPay: number
-  allowancesPay: number
-  overtimePay: number
+  monthYear: string // YYYY-MM format
+  
+  // Earnings
+  basicSalary: number
+  allowances: number
+  overtime: number
   bonuses: number
   grossPay: number
-  payeTax: number
-  nssfEmployee: number
-  shifDeduction: number
+  
+  // Overtime Details
+  overtimeHours: number
+  overtimeType: 'WEEKDAY' | 'HOLIDAY'
+  
+  // Bonus Details
+  bonusDescription?: string
+  
+  // Unpaid Leave
+  unpaidDays: number
+  unpaidDeduction: number
+  
+  // Statutory Deductions (Dec 2024 Tax Law)
+  paye: number
+  nssf: number
+  shif: number
   housingLevy: number
-  loanDeductions: number
-  advanceDeductions: number
-  otherDeductions: number
+  taxableIncome: number
+  
+  // Custom Deductions
+  customDeductions: number
+  
+  // Totals
   totalDeductions: number
   netPay: number
-  nssfEmployer: number
-  housingLevyEmployer: number
-  ytdGrossPay: number
-  ytdPayeTax: number
-  ytdNssf: number
-  ytdShif: number
-  ytdHousingLevy: number
-  ytdNetPay: number
-  status: 'CALCULATED' | 'PROCESSED' | 'CANCELLED'
-  processedAt?: string
-  createdAt: string
-  updatedAt: string
+  
+  // Additional Data (JSON fields)
+  deductions?: PayrollDeductions
+  earnings?: PayrollEarnings
+  calculations?: PayrollCalculations
+  
+  // Processing Info
+  processedAt: string | Date
+  processedBy?: string
+  status: 'DRAFT' | 'PROCESSING' | 'PROCESSED' | 'APPROVED' | 'PAID' | 'CANCELLED'
+  
+  // Timestamps
+  createdAt: string | Date
+  updatedAt: string | Date
 }
 
-export interface Payslip {
-  id: string
-  payslipNumber: string
-  employeeId: string
-  employee?: Employee
-  payrollRunId: string
-  payrollRun?: PayrollRun
-  payPeriod: string
-  issueDate: string
-  pdfGenerated: boolean
-  pdfPath?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface DashboardStats {
-  totalEmployees: number
-  activeEmployees: number
-  totalPayroll: number
-  payslipsGenerated: number
-  pendingPayrolls: number
-  lastPayrollDate?: string
-  monthlyGrowth: number
-  complianceStatus: 'good' | 'warning' | 'error'
-}
-
-export interface Activity {
-  id: string
-  type: 'employee_added' | 'payroll_processed' | 'payslip_generated' | 'employee_edited' | 'employee_deleted'
-  description: string
-  timestamp: string
-  user?: string
-  metadata?: Record<string, any>
-}
-
-export interface PayrollSummaryData {
-  currentMonth: string
-  totalEmployees: number
-  processedEmployees: number
-  totalGrossPay: number
-  totalNetPay: number
+export interface PayrollDeductions {
+  paye: number
+  nssf: number
+  shif: number
+  housingLevy: number
+  customDeductions: number
+  customDeductionDescription?: string
+  totalStatutory: number
   totalDeductions: number
-  status: 'not_started' | 'in_progress' | 'completed' | 'overdue'
-  dueDate?: string
-  lastProcessedDate?: string
+  // Additional breakdown
+  personalRelief?: number
+  insuranceRelief?: number
+  grossTax?: number
 }
 
-// API Response types
+export interface PayrollEarnings {
+  basicSalary: number
+  allowances: number
+  overtime: number
+  bonuses: number
+  grossPay: number
+}
+
+export interface PayrollCalculations {
+  workingDays: number
+  dailyRate: number
+  hourlyRate: number
+  unpaidDeduction: number
+  effectiveTaxRate: number
+  // Employer contributions
+  nssfEmployer?: number
+  shifEmployer?: number
+  housingLevyEmployer?: number
+}
+
+export interface PayslipData {
+  // Company Information
+  company: {
+    name: string
+    address: string
+    phone: string
+    email: string
+    kraPin?: string
+  }
+  
+  // Employee Information
+  employee: {
+    id: string
+    name: string
+    kraPin: string
+    nationalId: string
+    employeeNumber?: string
+    bankName: string
+    bankAccount: string
+    position?: string
+    department?: string
+  }
+  
+  // Payroll Information
+  payroll: {
+    monthYear: string
+    payPeriod: string // e.g., "January 2025"
+    payDate: string
+    processedDate: string
+  }
+  
+  // Earnings
+  earnings: {
+    basicSalary: number
+    allowances: number
+    overtime: number
+    overtimeHours: number
+    bonuses: number
+    bonusDescription?: string
+    grossPay: number
+  }
+  
+  // Deductions
+  deductions: {
+    // Allowable Deductions (Dec 2024 Tax Law)
+    nssf: number
+    shif: number
+    housingLevy: number
+    totalAllowable: number
+    
+    // Tax
+    taxableIncome: number
+    grossTax: number
+    personalRelief: number
+    insuranceRelief: number
+    paye: number
+    
+    // Other
+    customDeductions: number
+    customDeductionDescription?: string
+    totalDeductions: number
+  }
+  
+  // Net Pay
+  netPay: number
+  
+  // Employer Contributions
+  employerContributions: {
+    nssf: number
+    shif: number
+    housingLevy: number
+    total: number
+  }
+  
+  // Additional Info
+  additionalInfo?: {
+    unpaidDays?: number
+    unpaidDeduction?: number
+    effectiveTaxRate?: number
+    ytdGrossPay?: number
+    ytdNetPay?: number
+    ytdPaye?: number
+  }
+}
+
+// API Response Types
 export interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -108,38 +212,12 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
+  success: boolean
   data: T[]
   pagination: {
     page: number
     limit: number
     total: number
-    pages: number
+    totalPages: number
   }
-}
-
-// Form types
-export interface EmployeeFormData {
-  name: string
-  kraPin: string
-  nationalId: string
-  bankName: string
-  bankBranch: string
-  bankAccount: string
-  basicSalary: number
-  allowances: number
-  startDate: string
-  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL'
-}
-
-export interface PayrollCalculationInput {
-  employeeId: string
-  monthYear: string
-  workingDays: number
-  actualDays: number
-  overtimeHours: number
-  holidayHours: number
-  bonuses: number
-  loanDeductions: number
-  advanceDeductions: number
-  otherDeductions: number
 }

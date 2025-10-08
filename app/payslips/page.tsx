@@ -10,7 +10,38 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Download, Mail, Filter } from 'lucide-react'
 import { useToast } from "../providers"
 
-interface PayslipData {
+interface PayrollRun {
+  id: string
+  employeeId: string
+  monthYear: string
+  basicSalary: number
+  allowances: number
+  overtime: number
+  overtimeHours: number
+  bonuses: number
+  bonusDescription: string | null
+  grossPay: number
+  nssf: number
+  shif: number
+  housingLevy: number
+  paye: number
+  customDeductions: number
+  customDeductionDescription: string | null
+  totalDeductions: number
+  netPay: number
+  payDate: string
+  processedDate: string
+  status: string
+  employee: {
+    id: string
+    name: string
+    kraPin: string
+    email: string
+    employeeNumber: string | null
+  }
+}
+
+interface PayslipTableData {
   id: string
   payslipNumber: string
   employeeId: string
@@ -30,7 +61,7 @@ export default function PayslipsPage() {
   const router = useRouter()
   const { showToast } = useToast()
   
-  const [payslips, setPayslips] = useState<PayslipData[]>([])
+  const [payslips, setPayslips] = useState<PayslipTableData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -42,32 +73,71 @@ export default function PayslipsPage() {
   const loadPayslips = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/payslips')
+      
+      // Fetch from your payroll API endpoint
+      const response = await fetch('/api/payroll')
       
       if (!response.ok) {
         throw new Error('Failed to fetch payslips')
       }
       
-      const data = await response.json()
-      setPayslips(data)
+      const result = await response.json()
+      
+      // Check if the response has the expected structure
+      if (!result.success || !result.data) {
+        throw new Error('Invalid response structure')
+      }
+
+      // Transform PayrollRun data to PayslipTableData format
+      const transformedPayslips: PayslipTableData[] = result.data.map((run: PayrollRun) => ({
+        id: run.id,
+        payslipNumber: `PS-${run.monthYear}-${run.employee.employeeNumber || run.employeeId.slice(0, 6)}`,
+        employeeId: run.employeeId,
+        employeeName: run.employee.name,
+        kraPin: run.employee.kraPin,
+        payPeriod: getMonthYearDisplay(run.monthYear),
+        monthYear: run.monthYear,
+        grossPay: run.grossPay,
+        totalDeductions: run.totalDeductions,
+        netPay: run.netPay,
+        issueDate: run.processedDate,
+        pdfGenerated: true, // Assume all processed payslips can generate PDFs
+        status: run.status as 'PROCESSED' | 'CANCELLED'
+      }))
+
+      setPayslips(transformedPayslips)
     } catch (error) {
       console.error('Error loading payslips:', error)
       showToast('Failed to load payslips', 'error')
+      setPayslips([]) // Set empty array on error
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleViewPayslip = async (payslip: PayslipData) => {
+  const getMonthYearDisplay = (monthYear: string) => {
+    const [year, month] = monthYear.split('-')
+    const date = new Date(parseInt(year), parseInt(month) - 1)
+    return date.toLocaleDateString('en-KE', { year: 'numeric', month: 'long' })
+  }
+
+  const handleViewPayslip = async (payslip: PayslipTableData) => {
     try {
-      const response = await fetch(`/api/payslips/${payslip.id}`)
+      // Fetch full payslip details from the individual payroll endpoint
+      const response = await fetch(`/api/payroll/${payslip.id}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch payslip details')
       }
       
-      const detailedPayslip = await response.json()
-      setSelectedPayslip(detailedPayslip)
+      const result = await response.json()
+      
+      if (!result.success || !result.data) {
+        throw new Error('Invalid payslip data')
+      }
+
+      // Set the full payslip data for preview
+      setSelectedPayslip(result.data)
       setIsPreviewOpen(true)
     } catch (error) {
       console.error('Error loading payslip details:', error)
@@ -79,12 +149,13 @@ export default function PayslipsPage() {
     try {
       showToast('Generating PDF...', 'info')
       
-      const response = await fetch(`/api/payslips/${payslipId}/pdf`, {
+      const response = await fetch(`/api/payroll/${payslipId}/pdf`, {
         method: 'GET',
       })
       
       if (!response.ok) {
-        throw new Error('Failed to generate PDF')
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'Failed to generate PDF')
       }
       
       // Create a blob from the PDF stream
@@ -92,7 +163,14 @@ export default function PayslipsPage() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `payslip-${payslipId}.pdf`
+      
+      // Find the payslip to get a better filename
+      const payslip = payslips.find(p => p.id === payslipId)
+      const filename = payslip 
+        ? `payslip-${payslip.monthYear}-${payslip.employeeName.replace(/\s+/g, '-')}.pdf`
+        : `payslip-${payslipId}.pdf`
+      
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -101,7 +179,7 @@ export default function PayslipsPage() {
       showToast('Payslip downloaded successfully', 'success')
     } catch (error) {
       console.error('Error downloading payslip:', error)
-      showToast('Failed to download payslip', 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to download payslip', 'error')
     }
   }
 
@@ -109,18 +187,20 @@ export default function PayslipsPage() {
     try {
       showToast('Sending email...', 'info')
       
-      const response = await fetch(`/api/payslips/${payslipId}/email`, {
+      const response = await fetch(`/api/payroll/${payslipId}/email`, {
         method: 'POST',
       })
       
       if (!response.ok) {
-        throw new Error('Failed to send email')
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || 'Failed to send email')
       }
       
-      showToast('Payslip emailed successfully', 'success')
+      const result = await response.json()
+      showToast(result.message || 'Payslip emailed successfully', 'success')
     } catch (error) {
       console.error('Error sending email:', error)
-      showToast('Failed to send email', 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to send email', 'error')
     }
   }
 
@@ -128,7 +208,7 @@ export default function PayslipsPage() {
     try {
       showToast('Generating bulk download...', 'info')
       
-      const response = await fetch('/api/payslips/bulk-download', {
+      const response = await fetch('/api/payroll/bulk-download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +235,7 @@ export default function PayslipsPage() {
       showToast('Bulk download completed', 'success')
     } catch (error) {
       console.error('Error with bulk download:', error)
-      showToast('Failed to generate bulk download', 'error')
+      showToast('Bulk download not available yet', 'error')
     }
   }
 
@@ -184,13 +264,34 @@ export default function PayslipsPage() {
       headerActions={headerActions}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PayslipTable
-          payslips={payslips}
-          onView={handleViewPayslip}
-          onDownload={handleDownloadPayslip}
-          onEmail={handleEmailPayslip}
-          isLoading={isLoading}
-        />
+        {/* Loading State */}
+        {isLoading && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <p className="mt-4 text-gray-600">Loading payslips...</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && payslips.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">No payslips found</p>
+            <Button onClick={() => router.push('/payroll/run')}>
+              Generate Payroll
+            </Button>
+          </div>
+        )}
+
+        {/* Payslips Table */}
+        {!isLoading && payslips.length > 0 && (
+          <PayslipTable
+            payslips={payslips}
+            onView={handleViewPayslip}
+            onDownload={handleDownloadPayslip}
+            onEmail={handleEmailPayslip}
+            isLoading={isLoading}
+          />
+        )}
 
         {/* Payslip Preview Modal */}
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
@@ -201,8 +302,8 @@ export default function PayslipsPage() {
             {selectedPayslip && (
               <PayslipPreview
                 payslip={selectedPayslip}
-                onDownload={() => handleDownloadPayslip(selectedPayslip.id)}
-                onEmail={() => handleEmailPayslip(selectedPayslip.id)}
+                onDownload={() => handleDownloadPayslip(selectedPayslip.payrollRun.id)}
+                onEmail={() => handleEmailPayslip(selectedPayslip.payrollRun.id)}
                 onPrint={() => window.print()}
               />
             )}

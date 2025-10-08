@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
+import { prisma } from '@/lib/prisma'
 // You'll need archiver or similar for ZIP creation
 // import archiver from 'archiver'
 

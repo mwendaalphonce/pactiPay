@@ -1,7 +1,7 @@
 // src/app/api/payroll/calculate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
-import { calculatePayroll } from '@/app/lib/payroll/calculations'
+import { prisma } from '@/lib/prisma'
+import { calculatePayroll } from '@/lib/payroll/calculations'
 import { z } from 'zod'
 
 const payrollInputSchema = z.object({

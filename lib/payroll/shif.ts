@@ -1,6 +1,6 @@
 // src/lib/payroll/shif.ts
 
-import { SHIF_RATES } from '@/app/lib/constants/kenya-tax-rates'
+import { SHIF_RATES } from '@/lib/constants/kenya-tax-rates'
 
 
 export interface SHIFCalculationResult {

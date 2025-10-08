@@ -58,7 +58,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch employee',
+        error: 'Failed to fetch employee ',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

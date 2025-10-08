@@ -1,6 +1,6 @@
 // src/lib/payroll/housing-levy.ts
 
-import { HOUSING_LEVY_RATES } from '@/app/lib/constants/kenya-tax-rates'
+import { HOUSING_LEVY_RATES } from '@/lib/constants/kenya-tax-rates'
 
 /**
  * Affordable Housing Levy Calculations for Kenya 2025

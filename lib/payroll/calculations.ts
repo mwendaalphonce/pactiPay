@@ -4,7 +4,7 @@ import { calculateMonthlyPAYE, getPAYEBreakdown, InsuranceReliefInput } from './
 import { calculateNSSF } from './nssf'
 import { calculateSHIF } from './shif'
 import { calculateHousingLevy } from './housing-levy'
-import { WORKING_TIME } from '@/app/lib/constants/kenya-tax-rates'
+import { WORKING_TIME } from '@/lib/constants/kenya-tax-rates'
 
 /**
  * Core Payroll Calculation Engine for Kenya 2025

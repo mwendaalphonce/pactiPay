@@ -1,12 +1,11 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, createContext, useContext, useState } from 'react'
+import { SessionProvider } from 'next-auth/react'
 
 interface ToastContextType {
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void
 }
-
-import { createContext, useContext, useState } from 'react'
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
@@ -56,5 +55,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         ))}
       </div>
     </ToastContext.Provider>
+  )
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return <SessionProvider>{children}</SessionProvider>
+}
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      <ToastProvider>
+        {children}
+      </ToastProvider>
+    </SessionProvider>
   )
 }

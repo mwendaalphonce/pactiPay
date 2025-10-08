@@ -1,6 +1,6 @@
 // src/lib/payroll/nssf.ts
 
-import { NSSF_RATES, NSSF_TIERS } from '@/app/lib/constants/kenya-tax-rates'
+import { NSSF_RATES, NSSF_TIERS } from '@/lib/constants/kenya-tax-rates'
 
 /**
  * NSSF (National Social Security Fund) Calculations for Kenya 2025

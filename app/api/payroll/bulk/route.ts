@@ -1,7 +1,7 @@
 // src/app/api/payroll/bulk/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { calculatePayroll } from '@/app/lib/payroll/calculations'
-import { prisma } from '@/app/lib/prisma' // Adjust path as needed
+import { calculatePayroll } from '@/lib/payroll/calculations'
+import { prisma } from '@/lib/prisma' // Adjust path as needed
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 // src/lib/validations.ts
 
 import { z } from 'zod'
-import { KRA_PIN_PATTERN, NATIONAL_ID_PATTERN, BANK_ACCOUNT_PATTERN } from '@/app/lib/constants/kenya-tax-rates'
+import { KRA_PIN_PATTERN, NATIONAL_ID_PATTERN, BANK_ACCOUNT_PATTERN } from '@/lib/constants/kenya-tax-rates'
 
 /**
  * Validation schemas for Kenya Payroll System
@@ -9,6 +9,8 @@ import { KRA_PIN_PATTERN, NATIONAL_ID_PATTERN, BANK_ACCOUNT_PATTERN } from '@/ap
  */
 
 // Employee validation schema
+// Replace your employeeSchema with this updated version:
+
 export const employeeSchema = z.object({
   name: z.string()
     .min(2, 'Name must be at least 2 characters')
@@ -26,7 +28,8 @@ export const employeeSchema = z.object({
   employeeNumber: z.string()
     .min(1, 'Employee number is required')
     .max(20, 'Employee number must not exceed 20 characters')
-    .optional(),
+    .nullable()  // Allow null
+    .optional(), // Allow undefined
   
   bankName: z.string()
     .min(2, 'Bank name must be at least 2 characters')
@@ -65,10 +68,13 @@ export const employeeSchema = z.object({
     })
     .refine((date) => date <= new Date(), 'Start date cannot be in the future'),
   
-contractType: z.enum(['PERMANENT', 'CONTRACT', 'CASUAL', 'INTERN'], {
+  contractType: z.enum(['PERMANENT', 'CONTRACT', 'CASUAL', 'INTERN'], {
     errorMap: () => ({ message: 'Contract type must be PERMANENT, CONTRACT, CASUAL, or INTERN' })
   }).or(z.enum(['permanent', 'contract', 'casual', 'intern']))
-  .transform((val) => val.toUpperCase() as 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN')
+  .transform((val) => val.toUpperCase() as 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'),
+  
+  // Add isActive to the schema
+  isActive: z.boolean().optional()
 })
 
 // Payroll input validation schema

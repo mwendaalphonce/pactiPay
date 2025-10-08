@@ -1,6 +1,6 @@
 // src/app/api/payroll/[id]/export/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,

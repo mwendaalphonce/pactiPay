@@ -22,7 +22,7 @@ import {
   formatPayrollResult,
   type PayrollInput,
   type PayrollCalculationResult 
-} from '@/app/lib/payroll/calculations'
+} from '@/lib/payroll/calculations'
 
 interface PayrollCalculatorProps {
   employees: Employee[]

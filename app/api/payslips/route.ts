@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/app/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/payslips - Get all payslips with filtering
 export async function GET(request: NextRequest) {

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { Employee, PayrollRun } from '@/types'
 import { useToast } from '../providers'
-import type { PayrollCalculationResult } from '@/app/lib/payroll/calculations'
+import type { PayrollCalculationResult } from '@/lib/payroll/calculations'
 
 export default function PayrollPage() {
   const router = useRouter()
@@ -220,33 +220,35 @@ export default function PayrollPage() {
     router.push(`/payslips/${payrollRun.id}`)
   }
 
-  const handleExportPayroll = async (payrollRun: PayrollRun) => {
-    try {
-      showToast('Exporting payslip...', 'info')
-      
-      const response = await fetch(`/api/payroll/${payrollRun.id}/export`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to export payslip')
-      }
-      
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `payslip-${payrollRun.monthYear}-${payrollRun.employee?.name || payrollRun.employeeId}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      
-      showToast('Payslip exported successfully', 'success')
-    } catch (error) {
-      console.error('Error exporting payslip:', error)
-      showToast('Failed to export payslip', 'error')
+const handleExportPayroll = async (payrollRun: PayrollRun) => {
+  try {
+    showToast('Exporting payslip...', 'info')
+    
+    const response = await fetch(`/api/payroll/${payrollRun.id}/pdf`)
+    
+    if (!response.ok) {
+      // Log the actual error from the server
+      const errorData = await response.json().catch(() => null)
+      console.error('Server error:', errorData)
+      throw new Error(errorData?.error || 'Failed to export payslip')
     }
+    
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `payslip-${payrollRun.monthYear}-${payrollRun.employee?.name || payrollRun.employeeId}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    
+    showToast('Payslip exported successfully', 'success')
+  } catch (error: any) {
+    console.error('Error exporting payslip:', error)
+    showToast(error.message || 'Failed to export payslip', 'error')
   }
-
+}
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PROCESSED':
@@ -360,6 +362,7 @@ export default function PayrollPage() {
               History ({payrollRuns.length})
             </TabsTrigger>
           </TabsList>
+          
 
           {/* Payroll Calculator Tab */}
           <TabsContent value="calculator" className="space-y-6">

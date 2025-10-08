@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/app/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { Download, FileText, Loader2 } from "lucide-react";
 
 const monthNames = [

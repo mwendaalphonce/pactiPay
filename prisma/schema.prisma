@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,297 +7,366 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id                     String           @id @default(cuid())
+  name                   String?
+  email                  String           @unique
+  emailVerified          DateTime?
+  image                  String?
+  password               String?
+  hasCompletedOnboarding Boolean          @default(false)
+  onboardingCompletedAt  DateTime?
+  companyId              String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  accounts               Account[]
+  auditLogs              AuditLog[]
+  sessions               Session[]
+  UserPermission         UserPermission[]
+  roles                  UserRole[]
+  company                Company?         @relation(fields: [companyId], references: [id])
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Company {
+  id                 String     @id @default(cuid())
+  companyName        String
+  businessRegNo      String?
+  kraPin             String     @unique
+  nssfNumber         String?
+  nhifNumber         String?
+  shifNumber         String?
+  housingLevy        String?
+  email              String
+  phone              String?
+  physicalAddress    String?
+  postalAddress      String?
+  city               String?
+  county             String?
+  bankName           String?
+  bankBranch         String?
+  bankAccount        String?
+  swiftCode          String?
+  payrollDay         Int?       @default(25)
+  fiscalYearStart    String?    @default("01-01")
+  currency           String     @default("KES")
+  logo               String?
+  primaryColor       String?    @default("#2563eb")
+  signatoryName      String?
+  signatoryTitle     String?
+  signatorySignature String?
+  autoSubmitReturns  Boolean    @default(false)
+  enableEmailAlerts  Boolean    @default(true)
+  plan               String     @default("FREE")
+  maxEmployees       Int?       @default(10)
+  isActive           Boolean    @default(true)
+  suspendedAt        DateTime?
+  suspensionReason   String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  createdBy          String?
+  employees          Employee[]
+  users              User[]
+
+  @@map("companies")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  displayName String
+  description String?
+  level       Int
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  resource    String
+  action      String
+  scope       String?
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+  users       UserPermission[]
+
+  @@unique([resource, action, scope])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime  @default(now())
+  assignedBy String
+  expiresAt  DateTime?
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  granted      Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
 model Employee {
-  id String @id @default(cuid())
-
-  // Personal Information
-  name           String
-  kraPin         String  @unique // KRA PIN (A123456789Z format)
-  nationalId     String  @unique // National ID (8 digits)
-  employeeNumber String? @unique // Optional employee number
-
-  // Employment Details
-  basicSalary  Float // Monthly basic salary in KSh
-  allowances   Float        @default(0) // Monthly allowances in KSh
-  startDate    DateTime // Employment start date
-  contractType ContractType @default(PERMANENT)
-  isActive     Boolean      @default(true)
-
-  // Bank Details
-  bankName    String
-  bankBranch  String
-  bankAccount String
-  swiftCode   String?
-
-  // Contact Information (optional for MVP)
-  email       String?
-  phoneNumber String?
-  address     String?
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  id                String             @id @default(cuid())
+  companyId         String
+  name              String
+  kraPin            String
+  nationalId        String
+  employeeNumber    String?
+  basicSalary       Float
+  allowances        Float              @default(0)
+  startDate         DateTime
+  contractType      ContractType       @default(PERMANENT)
+  isActive          Boolean            @default(true)
+  bankName          String
+  bankBranch        String
+  bankAccount       String
+  swiftCode         String?
+  email             String?
+  phoneNumber       String?
+  address           String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  bonuses           Bonus[]
+  deductions        CustomDeduction[]
+  company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  insurancePremiums InsurancePremium[]
   payrollRuns       PayrollRun[]
   salaryAdjustments SalaryAdjustment[]
-  deductions        CustomDeduction[]
-  bonuses           Bonus[]
-  insurancePremiums InsurancePremium[]
 
+  @@unique([companyId, kraPin])
+  @@unique([companyId, nationalId])
+  @@unique([companyId, employeeNumber])
   @@map("employees")
 }
 
 model PayrollRun {
-  id         String @id @default(cuid())
-  employeeId String
-  monthYear  String // Format: YYYY-MM
+  id               String        @id @default(cuid())
+  employeeId       String
+  monthYear        String
+  basicSalary      Float
+  allowances       Float
+  overtime         Float         @default(0)
+  bonuses          Float         @default(0)
+  grossPay         Float
+  overtimeHours    Float         @default(0)
+  overtimeType     OvertimeType  @default(WEEKDAY)
+  bonusDescription String?
+  unpaidDays       Int           @default(0)
+  unpaidDeduction  Float         @default(0)
+  paye             Float         @default(0)
+  nssf             Float         @default(0)
+  shif             Float         @default(0)
+  housingLevy      Float         @default(0)
+  taxableIncome    Float         @default(0)
+  customDeductions Float         @default(0)
+  totalDeductions  Float
+  netPay           Float
+  deductions       Json?
+  earnings         Json?
+  calculations     Json?
+  processedAt      DateTime      @default(now())
+  processedBy      String?
+  status           PayrollStatus @default(PROCESSED)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  employee         Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  // Earnings Breakdown
-  basicSalary Float // Basic salary for the month
-  allowances  Float // Allowances for the month
-  overtime    Float @default(0) // Overtime earnings
-  bonuses     Float @default(0) // Bonus payments
-  grossPay    Float // Total gross pay
-
-  // Overtime Details
-  overtimeHours Float        @default(0)
-  overtimeType  OvertimeType @default(WEEKDAY)
-
-  // Bonus Details (added from old schema)
-  bonusDescription String? // Description of bonus payment
-
-  // Unpaid Leave
-  unpaidDays      Int   @default(0)
-  unpaidDeduction Float @default(0)
-
-  // Statutory Deductions
-  paye        Float @default(0) // PAYE tax
-  nssf        Float @default(0) // NSSF employee contribution
-  shif        Float @default(0) // SHIF employee contribution
-  housingLevy Float @default(0) // Housing levy employee contribution
-
-  // Tax Calculation (added from old schema)
-  taxableIncome Float @default(0) // Taxable income after allowable deductions
-
-  // Custom Deductions
-  customDeductions Float @default(0) // Total custom deductions
-
-  // Totals
-  totalDeductions Float // Total of all deductions
-  netPay          Float // Final net pay
-
-  // Additional Calculation Data (JSON for flexibility)
-  deductions   Json? // Detailed deduction breakdown
-  earnings     Json? // Detailed earnings breakdown
-  calculations Json? // Calculation metadata (rates, working days, etc.)
-
-  // Processing Information
-  processedAt DateTime      @default(now())
-  processedBy String? // For future user authentication
-  status      PayrollStatus @default(PROCESSED)
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  // Unique constraint: one payroll run per employee per month
   @@unique([employeeId, monthYear])
   @@map("payroll_runs")
 }
 
 model SalaryAdjustment {
-  id         String @id @default(cuid())
-  employeeId String
-
-  // Previous Salary Details
+  id                  String         @id @default(cuid())
+  employeeId          String
   previousBasicSalary Float
   previousAllowances  Float
-
-  // New Salary Details
-  newBasicSalary Float
-  newAllowances  Float
-
-  // Adjustment Details
-  effectiveDate  DateTime
-  reason         String
-  adjustmentType AdjustmentType
-  approvedBy     String? // For future user authentication
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  newBasicSalary      Float
+  newAllowances       Float
+  effectiveDate       DateTime
+  reason              String
+  adjustmentType      AdjustmentType
+  approvedBy          String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  employee            Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("salary_adjustments")
 }
 
 model CustomDeduction {
-  id         String @id @default(cuid())
-  employeeId String
-
-  // Deduction Details
+  id          String        @id @default(cuid())
+  employeeId  String
   amount      Float
   description String
   type        DeductionType
-
-  // Recurrence Settings
-  isRecurring Boolean @default(false)
-  startMonth  String? // YYYY-MM format
-  endMonth    String? // YYYY-MM format
-  isActive    Boolean @default(true)
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  isRecurring Boolean       @default(false)
+  startMonth  String?
+  endMonth    String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  employee    Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("custom_deductions")
 }
 
 model Bonus {
-  id         String @id @default(cuid())
-  employeeId String
-
-  // Bonus Details
+  id           String    @id @default(cuid())
+  employeeId   String
   amount       Float
   description  String
   type         BonusType
-  paymentMonth String // YYYY-MM format
-
-  // Tax Settings
-  isTaxable   Boolean @default(true)
-  isProcessed Boolean @default(false)
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  paymentMonth String
+  isTaxable    Boolean   @default(true)
+  isProcessed  Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("bonuses")
 }
 
 model InsurancePremium {
-  id         String @id @default(cuid())
-  employeeId String
-
-  // Insurance Details
-  insuranceType String // e.g., "Health", "Life", "Personal Accident"
-  provider      String // Insurance company name
-  policyNumber  String?
-
-  // Premium Details
-  monthlyPremium Float // Monthly premium amount in KSh
-  employeeShare  Float // Employee's contribution
-  employerShare  Float // Employer's contribution
-
-  // Coverage Period
-  startDate DateTime
-  endDate   DateTime?
-  isActive  Boolean   @default(true)
-
-  // Tax Relief (for NITA relief purposes)
-  isTaxRelief Boolean @default(false) // If eligible for tax relief
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id             String    @id @default(cuid())
+  employeeId     String
+  insuranceType  String
+  provider       String
+  policyNumber   String?
+  monthlyPremium Float
+  employeeShare  Float
+  employerShare  Float
+  startDate      DateTime
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  isTaxRelief    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("insurance_premiums")
 }
 
 model PayrollBatch {
-  id String @id @default(cuid())
-
-  // Personal Information
+  id             String      @id @default(cuid())
   name           String
-  kraPin         String  @unique // KRA PIN (A123456789Z format)
-  nationalId     String  @unique // National ID (8 digits)
-  employeeNumber String? @unique // Optional employee number
-
-  // Batch Details
-  monthYear      String // YYYY-MM format
+  kraPin         String
+  nationalId     String
+  employeeNumber String?
+  monthYear      String
   totalEmployees Int
   successfulRuns Int
   failedRuns     Int
-
-  // Processing Information
-  startedAt   DateTime    @default(now())
-  completedAt DateTime?
-  processedBy String? // For future user authentication
-  status      BatchStatus @default(PROCESSING)
-
-  // Error Tracking
-  errors Json? // Array of error details
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  startedAt      DateTime    @default(now())
+  completedAt    DateTime?
+  processedBy    String?
+  status         BatchStatus @default(PROCESSING)
+  errors         Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@map("payroll_batches")
 }
 
 model TaxRate {
-  id String @id @default(cuid())
-
-  // Rate Details
-  name     String // e.g., "PAYE", "NSSF", "SHIF", "Housing Levy"
-  rateType RateType
-  value    Float // Rate value (percentage or fixed amount)
-
-  // Applicable Period
+  id            String    @id @default(cuid())
+  name          String
+  rateType      RateType
+  value         Float
   effectiveFrom DateTime
   effectiveTo   DateTime?
-
-  // Additional Configuration (JSON for flexibility)
-  configuration Json? // Bands, limits, exemptions, etc.
-
-  // Audit Fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  configuration Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@map("tax_rates")
 }
 
 model AuditLog {
-  id String @id @default(cuid())
-
-  // Action Details
-  action     String // e.g., "CREATE_EMPLOYEE", "RUN_PAYROLL", "UPDATE_SALARY"
-  entityType String // e.g., "Employee", "PayrollRun"
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
   entityId   String
-
-  // User Information (for future authentication)
-  userId    String?
-  userEmail String?
-
-  // Change Details
-  oldValues Json? // Previous values
-  newValues Json? // New values
-
-  // Metadata
-  ipAddress String?
-  userAgent String?
-
-  // Audit Fields
-  createdAt DateTime @default(now())
+  userId     String?
+  userEmail  String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
 }
 
-// Enums
 enum ContractType {
   PERMANENT
   CONTRACT
