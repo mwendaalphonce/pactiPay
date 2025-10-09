@@ -390,49 +390,29 @@ function calculateHousingLevy(grossPay: number): { employee: number; employer: n
 export function demonstrateTaxLawChange() {
   const grossPay = 100000
   
-  console.log('=== COMPARISON: OLD vs NEW TAX LAW ===')
-  console.log(`Gross Pay: KSh ${grossPay.toLocaleString()}\n`)
   
   // OLD WAY (Before Dec 2024)
-  console.log('OLD LAW (Before Dec 2024):')
   const nssfOld = calculateNSSF(grossPay)
   const taxableIncomeOld = grossPay - nssfOld.employee
   const shifOld = calculateSHIF(grossPay)
   const hlOld = calculateHousingLevy(grossPay)
   const payeOld = calculatePAYE(taxableIncomeOld)
   
-  console.log(`  NSSF: KSh ${nssfOld.employee.toLocaleString()}`)
-  console.log(`  Taxable Income: KSh ${taxableIncomeOld.toLocaleString()}`)
-  console.log(`  PAYE: KSh ${payeOld.netTax.toLocaleString()}`)
-  console.log(`  SHIF (post-tax): KSh ${shifOld.employee.toLocaleString()}`)
-  console.log(`  Housing Levy (post-tax): KSh ${hlOld.employee.toLocaleString()}`)
   const totalDeductionsOld = payeOld.netTax + nssfOld.employee + shifOld.employee + hlOld.employee
   const netPayOld = grossPay - totalDeductionsOld
-  console.log(`  Net Pay: KSh ${netPayOld.toLocaleString()}\n`)
   
   // NEW WAY (After Dec 2024)
-  console.log('NEW LAW (After Dec 2024):')
   const nssfNew = calculateNSSF(grossPay)
   const shifNew = calculateSHIF(grossPay)
   const hlNew = calculateHousingLevy(grossPay)
   const taxableIncomeNew = grossPay - nssfNew.employee - shifNew.employee - hlNew.employee
   const payeNew = calculatePAYE(taxableIncomeNew)
   
-  console.log(`  NSSF: KSh ${nssfNew.employee.toLocaleString()} (allowable deduction)`)
-  console.log(`  SHIF: KSh ${shifNew.employee.toLocaleString()} (allowable deduction)`)
-  console.log(`  Housing Levy: KSh ${hlNew.employee.toLocaleString()} (allowable deduction)`)
-  console.log(`  Taxable Income: KSh ${taxableIncomeNew.toLocaleString()}`)
-  console.log(`  PAYE: KSh ${payeNew.netTax.toLocaleString()}`)
   const totalDeductionsNew = payeNew.netTax + nssfNew.employee + shifNew.employee + hlNew.employee
   const netPayNew = grossPay - totalDeductionsNew
-  console.log(`  Net Pay: KSh ${netPayNew.toLocaleString()}\n`)
   
   // Show the difference
   const savingsFromNewLaw = netPayNew - netPayOld
-  console.log('=== IMPACT ===')
-  console.log(`Tax Saved: KSh ${(payeOld.netTax - payeNew.netTax).toLocaleString()}`)
-  console.log(`Additional Take-Home Pay: KSh ${savingsFromNewLaw.toLocaleString()}`)
-  console.log(`Percentage Increase in Net Pay: ${((savingsFromNewLaw / netPayOld) * 100).toFixed(2)}%`)
 }
 
 export function validatePayrollInputs(employee: Employee): {

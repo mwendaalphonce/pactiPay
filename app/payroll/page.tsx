@@ -379,7 +379,7 @@ const handleExportPayroll = async (payrollRun: PayrollRun) => {
                 </CardContent>
               </Card>
             ) : (
-              <PayrollCalculator
+              <PayrollCalculator    
                 employees={employees}
                 onCalculate={handleCalculatePayroll}
                 onSave={handleSavePayroll}
@@ -615,7 +615,7 @@ const handleExportPayroll = async (payrollRun: PayrollRun) => {
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </Card> 
           </TabsContent>
         </Tabs>
       </div>

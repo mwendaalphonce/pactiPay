@@ -82,4 +82,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// src/app/api/payslips/[id]/route.ts
+api/payroll/[id]/route.ts

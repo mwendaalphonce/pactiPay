@@ -79,7 +79,6 @@ export default function PayslipDetailPage() {
       
       if (!response.ok) {
         throw new Error('Failed to generate PDF')
-        console.log(error)
       }
       
       const blob = await response.blob()

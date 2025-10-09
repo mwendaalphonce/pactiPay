@@ -9,7 +9,6 @@ export async function GET(
   try {
     // Await params in Next.js 15+
     const { id } = await params
-    console.log('PDF Route called for ID:', id) 
 
     // Fetch payslip data
     const baseUrl = request.nextUrl.origin

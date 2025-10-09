@@ -121,28 +121,9 @@ export default function PayslipsPage() {
     return date.toLocaleDateString('en-KE', { year: 'numeric', month: 'long' })
   }
 
-  const handleViewPayslip = async (payslip: PayslipTableData) => {
-    try {
-      // Fetch full payslip details from the individual payroll endpoint
-      const response = await fetch(`/api/payroll/${payslip.id}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch payslip details')
-      }
-      
-      const result = await response.json()
-      
-      if (!result.success || !result.data) {
-        throw new Error('Invalid payslip data')
-      }
-
-      // Set the full payslip data for preview
-      setSelectedPayslip(result.data)
-      setIsPreviewOpen(true)
-    } catch (error) {
-      console.error('Error loading payslip details:', error)
-      showToast('Failed to load payslip details', 'error')
-    }
+ const handleViewPayslip = (payslip: PayslipTableData) => {
+    // Navigate to payslip detail page
+    router.push(`/payslips/${payslip.id}`)
   }
 
   const handleDownloadPayslip = async (payslipId: string) => {

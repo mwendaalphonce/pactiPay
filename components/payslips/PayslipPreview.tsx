@@ -87,8 +87,9 @@ export default function PayslipPreview({
   onEmail, 
   onPrint 
 }: PayslipPreviewProps) {
-  const formatCurrency = (amount: number) => {
-    return `KSh ${amount.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const formatCurrency = (amount: number) => {
+    const value = amount || 0
+    return `KSh ${value.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   const formatDate = (dateString: string) => {

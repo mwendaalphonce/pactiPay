@@ -42,59 +42,44 @@ const onboardingSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    console.log('=== ONBOARDING API CALLED ===')
     
     const session = await getServerSession(authOptions)
     
     
     if (!session) {
-      console.error('❌ No session found')
       return Response.json({ error: 'No session found. Please sign in again.' }, { status: 401 })
     }
     
     if (!session.user) {
-      console.error('❌ No user in session')
       return Response.json({ error: 'No user found in session. Please sign in again.' }, { status: 401 })
     }
     
     if (!session.user.id) {
-      console.error('❌ No user ID in session:', session)
       return Response.json({ 
         error: 'Session is invalid. Please sign out and sign in again.',
         debug: process.env.NODE_ENV === 'development' ? { session } : undefined
       }, { status: 401 })
     }
     
-    console.log('✓ Session valid, user ID:', session.user.id)
     
     // Check if already onboarded
     const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     })
     
-    console.log('User from DB:', {
-      found: !!user,
-      id: user?.id,
-      email: user?.email,
-      hasCompleted: user?.hasCompletedOnboarding,
-    })
-    
+ 
     if (!user) {
-      console.error('❌ User not found in database')
       return Response.json({ error: 'User not found in database' }, { status: 404 })
     }
     
     if (user.hasCompletedOnboarding) {
-      console.log('⚠️ User already onboarded')
       return Response.json({ error: 'Already onboarded' }, { status: 400 })
     }
     
     const body = await req.json()
-    console.log('Request body received, validating...')
     
     // Validate input
     const validatedData = onboardingSchema.parse(body)
-    console.log('✓ Validation passed')
     
     // Check if KRA PIN already exists
     const existingCompany = await prisma.company.findUnique({
@@ -102,13 +87,11 @@ export async function POST(req: Request) {
     })
     
     if (existingCompany) {
-      console.log('⚠️ KRA PIN already exists')
       return Response.json({ 
         error: 'A company with this KRA PIN already exists' 
       }, { status: 400 })
     }
     
-    console.log('Starting transaction...')
     
     // Create company and update user in a transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -139,7 +122,6 @@ export async function POST(req: Request) {
         },
       })
       
-      console.log('✓ Company created:', company.id)
       
       // Update user to mark onboarding complete
       await tx.user.update({
@@ -151,7 +133,6 @@ export async function POST(req: Request) {
         },
       })
       
-      console.log('✓ User updated')
       
       // Get or create Super Admin role
       let superAdminRole = await tx.role.findUnique({
@@ -159,7 +140,6 @@ export async function POST(req: Request) {
       })
       
       if (!superAdminRole) {
-        console.log('Creating default roles...')
         
         // Create default roles if they don't exist
         superAdminRole = await tx.role.create({
@@ -228,7 +208,6 @@ export async function POST(req: Request) {
           }))
         })
         
-        console.log('✓ Default roles and permissions created')
       }
       
       // Assign Super Admin role to first user
@@ -240,7 +219,6 @@ export async function POST(req: Request) {
         },
       })
       
-      console.log('✓ Super Admin role assigned')
       
       // Log audit trail
       await tx.auditLog.create({
@@ -259,12 +237,10 @@ export async function POST(req: Request) {
         },
       })
       
-      console.log('✓ Audit log created')
       
       return { company, superAdminRole }
     })
     
-    console.log('✓ Transaction completed successfully')
     
     return Response.json({
       success: true,
