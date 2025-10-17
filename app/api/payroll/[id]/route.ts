@@ -1,5 +1,7 @@
-// src/app/api/payroll/[id]/route.ts
+// app/api/payroll/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { PayslipData } from '@/types'
 
@@ -8,13 +10,27 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // 🔒 SECURITY: Get authenticated user session
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
     const payrollId = params.id
     
-    // Fetch payroll run with employee details
+    // Fetch payroll run with employee and company details
     const payrollRun = await prisma.payrollRun.findUnique({
       where: { id: payrollId },
       include: {
-        employee: true
+        employee: {
+          include: {
+            company: true
+          }
+        }
       }
     })
     
@@ -25,18 +41,32 @@ export async function GET(
       )
     }
     
-    // Get deductions from JSON field if available
+    // 🔒 SECURITY: Ensure user can only access payroll from their company
+    if (payrollRun.employee.companyId !== session.user.companyId) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Cannot access payroll from different company' },
+        { status: 403 }
+      )
+    }
+    
+    // Get data from JSON fields if available
     const deductions = payrollRun.deductions as any || {}
+    const earnings = payrollRun.earnings as any || {}
     const calculations = payrollRun.calculations as any || {}
     
     // Prepare payslip data
     const payslipData: PayslipData = {
       company: {
-        name: process.env.COMPANY_NAME || 'Your Company Name',
-        address: process.env.COMPANY_ADDRESS || 'Company Address',
-        phone: process.env.COMPANY_PHONE || 'Company Phone',
-        email: process.env.COMPANY_EMAIL || 'company@email.com',
-        kraPin: process.env.COMPANY_KRA_PIN
+        id: payrollRun.employee.company.id,
+        name: payrollRun.employee.company.companyName,
+        address: payrollRun.employee.company.physicalAddress || undefined,
+        phone: payrollRun.employee.company.phone || undefined,
+        email: payrollRun.employee.company.email,
+        kraPin: payrollRun.employee.company.kraPin,
+        logo: payrollRun.employee.company.logo || undefined,
+        signatoryName: payrollRun.employee.company.signatoryName || undefined,
+        signatoryTitle: payrollRun.employee.company.signatoryTitle || undefined,
+        signatorySignature: payrollRun.employee.company.signatorySignature || undefined,
       },
       employee: {
         id: payrollRun.employee.id,
@@ -44,22 +74,27 @@ export async function GET(
         kraPin: payrollRun.employee.kraPin,
         nationalId: payrollRun.employee.nationalId,
         employeeNumber: payrollRun.employee.employeeNumber || undefined,
+        email: payrollRun.employee.email || undefined,
+        phone: payrollRun.employee.phoneNumber || undefined,
         bankName: payrollRun.employee.bankName,
         bankAccount: payrollRun.employee.bankAccount,
-        position: undefined, // Add from employee if you have this field
-        department: undefined // Add from employee if you have this field
+        // Uncomment if you have these fields in your schema
+        // position: payrollRun.employee.position || undefined,
+        // department: payrollRun.employee.department || undefined,
       },
       payroll: {
+        id: payrollRun.id,
         monthYear: payrollRun.monthYear,
         payPeriod: getPayPeriodDisplay(payrollRun.monthYear),
         payDate: payrollRun.processedAt.toISOString(),
-        processedDate: payrollRun.createdAt.toISOString()
+        processedDate: payrollRun.createdAt.toISOString(),
+        status: payrollRun.status
       },
       earnings: {
         basicSalary: payrollRun.basicSalary,
         allowances: payrollRun.allowances,
         overtime: payrollRun.overtime,
-        overtimeHours: payrollRun.overtimeHours,
+        overtimeHours: payrollRun.overtimeHours || 0,
         bonuses: payrollRun.bonuses,
         bonusDescription: payrollRun.bonusDescription || undefined,
         grossPay: payrollRun.grossPay
@@ -70,9 +105,9 @@ export async function GET(
         housingLevy: payrollRun.housingLevy,
         totalAllowable: payrollRun.nssf + payrollRun.shif + payrollRun.housingLevy,
         taxableIncome: payrollRun.taxableIncome,
-        grossTax: deductions.grossTax || 0,
-        personalRelief: deductions.personalRelief || 0,
-        insuranceRelief: deductions.insuranceRelief || 0,
+        grossTax: deductions.grossTax || calculations.grossTax || 0,
+        personalRelief: deductions.personalRelief || calculations.personalRelief || 2400,
+        insuranceRelief: deductions.insuranceRelief || calculations.insuranceRelief || 0,
         paye: payrollRun.paye,
         customDeductions: payrollRun.customDeductions,
         customDeductionDescription: deductions.customDeductionDescription || undefined,
@@ -80,15 +115,18 @@ export async function GET(
       },
       netPay: payrollRun.netPay,
       employerContributions: {
-        nssf: calculations.nssfEmployer || 0,
-        shif: calculations.shifEmployer || 0,
-        housingLevy: calculations.housingLevyEmployer || 0,
-        total: (calculations.nssfEmployer || 0) + (calculations.shifEmployer || 0) + (calculations.housingLevyEmployer || 0)
+        nssf: calculations.nssfEmployer || payrollRun.nssf,
+        shif: calculations.shifEmployer || payrollRun.shif,
+        housingLevy: calculations.housingLevyEmployer || payrollRun.housingLevy,
+        total: (calculations.nssfEmployer || payrollRun.nssf) + 
+               (calculations.shifEmployer || payrollRun.shif) + 
+               (calculations.housingLevyEmployer || payrollRun.housingLevy)
       },
       additionalInfo: {
         unpaidDays: payrollRun.unpaidDays || undefined,
         unpaidDeduction: payrollRun.unpaidDeduction || undefined,
-        effectiveTaxRate: calculations.effectiveTaxRate || undefined
+        effectiveTaxRate: calculations.effectiveTaxRate || 
+                         (payrollRun.paye / payrollRun.grossPay * 100) || undefined
       }
     }
     
@@ -102,7 +140,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error fetching payslip:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch payslip' },
+      { success: false, error: 'Failed to fetch payslip', details: error.message },
       { status: 500 }
     )
   }

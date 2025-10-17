@@ -93,29 +93,57 @@ export default function PayrollPage() {
       const { calculationResult, ...payrollData } = saveData
       
       // Prepare the payload for the API
-      const payload = {
-        employeeId: payrollData.employeeId,
-        monthYear: payrollData.monthYear,
-        overtimeHours: payrollData.overtimeHours || 0,
-        overtimeType: payrollData.overtimeType || 'weekday',
-        unpaidDays: payrollData.unpaidDays || 0,
-        customDeductions: payrollData.customDeductions || 0,
-        customDeductionDescription: payrollData.customDeductionDescription || null,
-        bonuses: payrollData.bonuses || 0,
-        bonusDescription: payrollData.bonusDescription || null,
-        // Include calculated values for database storage
-        basicSalary: calculationResult?.earnings.basicSalary || 0,
-        allowances: calculationResult?.earnings.allowances || 0,
-        overtime: calculationResult?.earnings.overtime || 0,
-        grossPay: calculationResult?.earnings.grossPay || 0,
-        nssf: calculationResult?.deductions.nssf || 0,
-        shif: calculationResult?.deductions.shif || 0,
-        housingLevy: calculationResult?.deductions.housingLevy || 0,
-        taxableIncome: calculationResult?.deductions.taxableIncome || 0,
-        paye: calculationResult?.deductions.paye || 0,
-        totalDeductions: calculationResult?.deductions.totalDeductions || 0,
-        netPay: calculationResult?.netPay || 0
-      }
+     // In your /api/payroll POST endpoint
+// Update the payload to include all calculation details
+
+const payload = {
+  employeeId: payrollData.employeeId,
+  monthYear: payrollData.monthYear,
+  overtimeHours: payrollData.overtimeHours || 0,
+  overtimeType: payrollData.overtimeType || 'weekday',
+  unpaidDays: payrollData.unpaidDays || 0,
+  customDeductions: payrollData.customDeductions || 0,
+  customDeductionDescription: payrollData.customDeductionDescription || null,
+  bonuses: payrollData.bonuses || 0,
+  bonusDescription: payrollData.bonusDescription || null,
+  
+  // Calculated values for database storage
+  basicSalary: calculationResult?.earnings.basicSalary || 0,
+  allowances: calculationResult?.earnings.allowances || 0,
+  overtime: calculationResult?.earnings.overtime || 0,
+  grossPay: calculationResult?.earnings.grossPay || 0,
+  nssf: calculationResult?.deductions.nssf || 0,
+  shif: calculationResult?.deductions.shif || 0,
+  housingLevy: calculationResult?.deductions.housingLevy || 0,
+  taxableIncome: calculationResult?.deductions.taxableIncome || 0,
+  paye: calculationResult?.deductions.paye || 0,
+  totalDeductions: calculationResult?.deductions.totalDeductions || 0,
+  netPay: calculationResult?.netPay || 0,
+  
+  // Store detailed calculation breakdown in the deductions JSON field
+  deductions: {
+    // Allowable deductions
+    nssf: calculationResult?.deductions.nssf || 0,
+    shif: calculationResult?.deductions.shif || 0,
+    housingLevy: calculationResult?.deductions.housingLevy || 0,
+    totalAllowableDeductions: calculationResult?.deductions.totalAllowableDeductions || 0,
+    
+    // Tax calculation
+    taxableIncome: calculationResult?.deductions.taxableIncome || 0,
+    grossTax: calculationResult?.deductions.grossTax || 0,
+    personalRelief: calculationResult?.deductions.personalRelief || 0,
+    insuranceRelief: calculationResult?.deductions.insuranceRelief || 0,
+    disabilityExemption: calculationResult?.deductions.disabilityExemption || 0,
+    paye: calculationResult?.deductions.paye || 0,
+    
+    // Other deductions
+    customDeductions: payrollData.customDeductions || 0,
+    totalDeductions: calculationResult?.deductions.totalDeductions || 0,
+    
+    // Breakdown by tax bands (if you want to show this detail)
+    taxBands: calculationResult?.calculations?.taxBands || []
+  }
+}
 
       const response = await fetch('/api/payroll', {
         method: 'POST',

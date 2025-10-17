@@ -7,6 +7,15 @@ import PayslipTable from '@/components/payslips/PayslipTable'
 import PayslipPreview from '@/components/payslips/PayslipPreview'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { Download, Mail, Filter } from 'lucide-react'
 import { useToast } from "../providers"
 
@@ -36,7 +45,7 @@ interface PayrollRun {
     id: string
     name: string
     kraPin: string
-    email: string
+    email?: string
     employeeNumber: string | null
   }
 }
@@ -57,6 +66,8 @@ interface PayslipTableData {
   status: 'PROCESSED' | 'CANCELLED'
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function PayslipsPage() {
   const router = useRouter()
   const { showToast } = useToast()
@@ -65,17 +76,19 @@ export default function PayslipsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
     loadPayslips()
-  }, [])
+  }, [currentPage])
 
   const loadPayslips = async () => {
     try {
       setIsLoading(true)
       
-      // Fetch from your payroll API endpoint
-      const response = await fetch('/api/payroll')
+      // Fetch from your payroll API endpoint with pagination
+      const response = await fetch(`/api/payroll?page=${currentPage}&limit=${ITEMS_PER_PAGE}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch payslips')
@@ -86,6 +99,11 @@ export default function PayslipsPage() {
       // Check if the response has the expected structure
       if (!result.success || !result.data) {
         throw new Error('Invalid response structure')
+      }
+
+      // Set total count if provided by API
+      if (result.pagination?.total) {
+        setTotalCount(result.pagination.total)
       }
 
       // Transform PayrollRun data to PayslipTableData format
@@ -101,7 +119,7 @@ export default function PayslipsPage() {
         totalDeductions: run.totalDeductions,
         netPay: run.netPay,
         issueDate: run.processedDate,
-        pdfGenerated: true, // Assume all processed payslips can generate PDFs
+        pdfGenerated: true,
         status: run.status as 'PROCESSED' | 'CANCELLED'
       }))
 
@@ -109,7 +127,7 @@ export default function PayslipsPage() {
     } catch (error) {
       console.error('Error loading payslips:', error)
       showToast('Failed to load payslips', 'error')
-      setPayslips([]) // Set empty array on error
+      setPayslips([])
     } finally {
       setIsLoading(false)
     }
@@ -121,8 +139,7 @@ export default function PayslipsPage() {
     return date.toLocaleDateString('en-KE', { year: 'numeric', month: 'long' })
   }
 
- const handleViewPayslip = (payslip: PayslipTableData) => {
-    // Navigate to payslip detail page
+  const handleViewPayslip = (payslip: PayslipTableData) => {
     router.push(`/payslips/${payslip.id}`)
   }
 
@@ -139,13 +156,11 @@ export default function PayslipsPage() {
         throw new Error(errorData?.error || 'Failed to generate PDF')
       }
       
-      // Create a blob from the PDF stream
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       
-      // Find the payslip to get a better filename
       const payslip = payslips.find(p => p.id === payslipId)
       const filename = payslip 
         ? `payslip-${payslip.monthYear}-${payslip.employeeName.replace(/\s+/g, '-')}.pdf`
@@ -220,6 +235,45 @@ export default function PayslipsPage() {
     }
   }
 
+  // Calculate total pages
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = []
+    const maxVisiblePages = 5
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i)
+        }
+        pages.push('ellipsis')
+        pages.push(totalPages)
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1)
+        pages.push('ellipsis')
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i)
+        }
+      } else {
+        pages.push(1)
+        pages.push('ellipsis')
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i)
+        }
+        pages.push('ellipsis')
+        pages.push(totalPages)
+      }
+    }
+    
+    return pages
+  }
+
   const headerActions = (
     <div className="flex items-center gap-2">
       <Button 
@@ -265,13 +319,59 @@ export default function PayslipsPage() {
 
         {/* Payslips Table */}
         {!isLoading && payslips.length > 0 && (
-          <PayslipTable
-            payslips={payslips}
-            onView={handleViewPayslip}
-            onDownload={handleDownloadPayslip}
-            onEmail={handleEmailPayslip}
-            isLoading={isLoading}
-          />
+          <>
+            <PayslipTable
+              payslips={payslips}
+              onView={handleViewPayslip}
+              onDownload={handleDownloadPayslip}
+              onEmail={handleEmailPayslip}
+              isLoading={isLoading}
+            />
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to{' '}
+                  {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} payslips
+                </div>
+                
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    
+                    {getPageNumbers().map((page, index) => (
+                      <PaginationItem key={index}>
+                        {page === 'ellipsis' ? (
+                          <PaginationEllipsis />
+                        ) : (
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page as number)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
         )}
 
         {/* Payslip Preview Modal */}

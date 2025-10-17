@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { parse } from "papaparse";
+import { parse, unparse } from "papaparse";
 
 // P10 Submission Model (add to schema.prisma)
 // model P10Submission {
@@ -102,16 +102,16 @@ async function generateP10CSV(
     "",
   ];
 
-  const csv = header.join("\n") + "\n" + Papa.unparse(rows);
+  const csv = header.join("\n") + "\n" + unparse(rows);
   return csv;
 }
 
 // Helper: Validate P10 CSV
-async function validateP10CSV(csvText: string): Promise<{
+function validateP10CSV(csvText: string): {
   valid: boolean;
   errors: string[];
   data: P10EmployeeRow[];
-}> {
+} {
   const errors: string[] = [];
   let data: P10EmployeeRow[] = [];
 
@@ -191,39 +191,33 @@ async function validateP10CSV(csvText: string): Promise<{
   }
 }
 
-// Helper: Submit to KRA API
-async function submitToKRA(
-  csv: string,
-  kraPin: string,
-  apiKey: string
-): Promise<{ success: boolean; kraReference?: string; error?: string }> {
+// Helper: Mark submission as submitted (for tracking manual submissions)
+async function markAsSubmitted(
+  companyId: string,
+  month: number,
+  year: number,
+  submissionNotes?: string
+): Promise<{ success: boolean }> {
   try {
-    // Placeholder - Replace with actual KRA API endpoint
-    const KRA_API_URL = process.env.KRA_API_URL || "https://api.kra.go.ke/p10/submit";
-
-    const response = await fetch(KRA_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/csv",
-        Authorization: `Bearer ${apiKey}`,
-        "X-KRA-PIN": kraPin,
+    await prisma.p10Submission.update({
+      where: {
+        companyId_month_year: {
+          companyId,
+          month,
+          year,
+        },
       },
-      body: csv,
+      data: {
+        status: "SUBMITTED",
+        submittedAt: new Date(),
+        kraReference: submissionNotes || "Manual submission via iTax portal",
+      },
     });
 
-    if (!response.ok) {
-      throw new Error(`KRA API error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return {
-      success: true,
-      kraReference: result.referenceNumber || result.id,
-    };
+    return { success: true };
   } catch (error) {
     return {
       success: false,
-      error: (error as Error).message,
     };
   }
 }
@@ -316,7 +310,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const validation = await validateP10CSV(csvData);
+      const validation = validateP10CSV(csvData);
 
       if (!validation.valid) {
         return NextResponse.json(
@@ -364,70 +358,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (action === "submit") {
-      // Submit to KRA
-      const submission = existing || (await generateP10CSV(user.companyId, month, year));
+    if (action === "markSubmitted") {
+      // Mark as manually submitted via iTax portal
+      const submissionNotes = body.submissionNotes || "Manual submission via KRA iTax portal";
 
-      if (!submission) {
-        return NextResponse.json(
-          { error: "No P10 submission found" },
-          { status: 404 }
-        );
-      }
-
-      const company = await prisma.company.findUnique({
-        where: { id: user.companyId },
-      });
-
-      if (!company) {
-        return NextResponse.json(
-          { error: "Company not found" },
-          { status: 404 }
-        );
-      }
-
-      const kraApiKey = process.env.KRA_API_KEY;
-      if (!kraApiKey) {
-        return NextResponse.json(
-          { error: "KRA API key not configured" },
-          { status: 500 }
-        );
-      }
-
-      const kraResult = await submitToKRA(
-        csvData || existing?.csvData || "",
-        company.kraPin,
-        kraApiKey
+      const result = await markAsSubmitted(
+        user.companyId,
+        month,
+        year,
+        submissionNotes
       );
 
-      if (!kraResult.success) {
-        // Save error
-        await prisma.p10Submission.update({
-          where: {
-            companyId_month_year: {
-              companyId: user.companyId,
-              month,
-              year,
-            },
-          },
-          data: {
-            status: "REJECTED",
-            errors: { message: kraResult.error },
-          },
-        });
-
+      if (!result.success) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "KRA submission failed",
-            error: kraResult.error,
-          },
+          { error: "Failed to mark as submitted" },
           { status: 400 }
         );
       }
 
-      // Save successful submission
-      const updatedSubmission = await prisma.p10Submission.update({
+      const submission = await prisma.p10Submission.findUnique({
         where: {
           companyId_month_year: {
             companyId: user.companyId,
@@ -435,20 +384,13 @@ export async function POST(request: NextRequest) {
             year,
           },
         },
-        data: {
-          status: "SUBMITTED",
-          kraReference: kraResult.kraReference,
-          submittedAt: new Date(),
-          submittedBy: user.id,
-        },
       });
 
       return NextResponse.json(
         {
           success: true,
-          message: "P10 submitted to KRA successfully",
-          submission: updatedSubmission,
-          kraReference: kraResult.kraReference,
+          message: "P10 marked as submitted to KRA",
+          submission,
         },
         { status: 200 }
       );

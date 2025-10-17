@@ -128,7 +128,7 @@ export const authOptions: NextAuthOptions = {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
             select: {
-              id: true,
+              id: true, 
               email: true,
               name: true,
               image: true,

@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AppProviders } from './providers'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,12 +22,23 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en"   suppressHydrationWarning className="h-full">
       <body className={`${inter.className} h-full bg-gray-50`}>
+
         <AppProviders>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+          
+          
+
           <div className="flex flex-col min-h-screen">
             {children}
           </div>
+          </ThemeProvider>
         </AppProviders>
       </body>
     </html>

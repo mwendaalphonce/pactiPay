@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/page.tsx - Fixed data access
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,6 +12,7 @@ import RecentActivity from '@/components/dashboard/RecentActivity'
 import PayrollSummary from '@/components/dashboard/PayrollSummary'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { P10ReportDownload } from '@/components/p10-download'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   TrendingUp, 
@@ -103,11 +104,18 @@ export default function Dashboard() {
         })
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch dashboard data: ${response.status}`)
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Failed to fetch dashboard data: ${response.status}`)
         }
 
-        const data = await response.json()
-        setDashboardData(data)
+        const result = await response.json()
+        
+        // FIX: Access the nested data property
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to load dashboard data')
+        }
+        
+        setDashboardData(result.data) // Access result.data instead of result directly
       } catch (err) {
         console.error('Error loading dashboard data:', err)
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
@@ -131,10 +139,11 @@ export default function Dashboard() {
   const handleViewPayslips = () => {
     router.push('/payslips')
   }
+  
 
   const handleDownloadReports = async () => {
     try {
-      const response = await fetch('/api/reports/download', {
+      const response = await fetch('/api/payroll/p10/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -565,6 +574,7 @@ export default function Dashboard() {
       </div>
 
       {/* Footer */}
+    <P10ReportDownload />
       <Footer />
     </div>
   )

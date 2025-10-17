@@ -15,7 +15,7 @@ interface QuickActionsProps {
   onAddEmployee: () => void
   onRunPayroll: () => void
   onViewPayslips: () => void
-  onDownloadReports: () => void
+  onDownloadReports: (reportType: 'monthly_payroll' | 'employee_summary' | 'statutory_deductions' | 'p10') => void
   onViewSettings: () => void
   onViewReports: () => void
 }
@@ -43,30 +43,27 @@ export default function QuickActions({
     },
     {
       title: 'View Payslips',
-      
       icon: FileText,
       color: 'bg-purple-500 hover:bg-purple-600',
       onClick: onViewPayslips
     },
     {
       title: 'Reports',
-      
       icon: Download,
       color: 'bg-orange-500 hover:bg-orange-600',
-      onClick: onDownloadReports
+      onClick: () => onDownloadReports('monthly_payroll')
     },
     {
       title: 'View Reports',
-     
       icon: BarChart3,
       color: 'bg-indigo-500 hover:bg-indigo-600',
       onClick: onViewReports
     },
     {
-      title: 'Settings',
-      icon: Settings,
-      color: 'bg-gray-500 hover:bg-gray-600',
-      onClick: onViewSettings
+      title: 'P10 Reports',
+      icon: Download,
+      color: 'bg-orange-500 hover:bg-orange-800',
+      onClick: () => onDownloadReports('p10')
     }
   ]
 

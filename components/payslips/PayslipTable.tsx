@@ -180,8 +180,6 @@ export default function PayslipTable({
                 <TableHead>Gross Pay</TableHead>
                 <TableHead>Deductions</TableHead>
                 <TableHead>Net Pay</TableHead>
-                <TableHead>Issue Date</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead className="w-[50px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -332,4 +330,4 @@ export default function PayslipTable({
       </CardContent>
     </Card>
   )
-}
+}4

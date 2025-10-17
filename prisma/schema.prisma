@@ -106,6 +106,7 @@ model Company {
   createdBy          String?
   employees          Employee[]
   users              User[]
+  p10Submissions     P10Submission[]
 
   @@map("companies")
 }
@@ -122,6 +123,36 @@ model Role {
   users       UserRole[]
 
   @@map("roles")
+}
+
+model P10Submission {
+  id           String     @id @default(cuid())
+  companyId    String
+  month        Int
+  year         Int
+  status       P10Status  @default(DRAFT)
+  csvData      String?    @db.Text
+  kraReference String?
+  submittedAt  DateTime?
+  submittedBy  String?
+  errors       Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month, year])
+  @@map("p10_submissions")
+}
+
+
+enum P10Status {
+  DRAFT
+  VALIDATED
+  SUBMITTED
+  APPROVED
+  REJECTED
+
+  @@map("p10_status")
 }
 
 model Permission {
@@ -201,6 +232,27 @@ model Employee {
   insurancePremiums InsurancePremium[]
   payrollRuns       PayrollRun[]
   salaryAdjustments SalaryAdjustment[]
+  residentialStatus ResidentialStatus  @default(RESIDENT)
+  employeeType      EmployeeType       @default(PRIMARY)
+  
+  // Pension/Retirement Information
+  pensionScheme     Boolean            @default(false)
+  pensionSchemeNo   String?
+  
+  // Housing/Accommodation Benefits
+  housingBenefit    HousingBenefit     @default(NOT_PROVIDED)
+  valueOfQuarters   Float?             @default(0)
+  actualRent        Float?             @default(0)
+  
+  // Allowances Breakdown (for P10)
+  housingAllowance  Float?             @default(0)
+  transportAllowance Float?            @default(0)
+  leavePay          Float?             @default(0)
+  otherAllowances   Float?             @default(0)
+  
+  // Tax Relief Information
+  ownerOccupierInterest Float?         @default(0)
+
 
   @@unique([companyId, kraPin])
   @@unique([companyId, nationalId])
@@ -444,4 +496,26 @@ enum RateType {
   TIERED
 
   @@map("rate_type")
+}
+enum ResidentialStatus {
+  RESIDENT
+  NON_RESIDENT
+  
+  @@map("residential_status")
+}
+
+enum EmployeeType {
+  PRIMARY
+  SECONDARY
+  
+  @@map("employee_type")
+}
+
+enum HousingBenefit {
+  NOT_PROVIDED
+  EMPLOYER_OWNED
+  EMPLOYER_RENTED
+  AGRICULTURE_FARM
+  
+  @@map("housing_benefit")
 }

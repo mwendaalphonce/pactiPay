@@ -1,16 +1,32 @@
 // src/app/api/dashboard/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    // 🔒 SECURITY: Get authenticated user's session
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+          message: 'You must be associated with a company to view dashboard data'
+        },
+        { status: 401 }
+      )
+    }
+    
+    const companyId = session.user.companyId
+    
     // Get current month for payroll calculations
     const now = new Date()
     const currentMonth = now.toISOString().slice(0, 7) // YYYY-MM format
     
-    // Parallel database queries for better performance
+    // 🔒 CRITICAL: ALL queries now filter by companyId
     const [
       employees,
       currentMonthPayrolls,
@@ -19,9 +35,13 @@ export async function GET(request: NextRequest) {
       recentAdjustments,
       allPayrollsThisMonth,
       previousMonthPayrolls,
+      contractEmployeesCount,
     ] = await Promise.all([
-      // Get all employees
+      // Get all employees FROM THIS COMPANY
       prisma.employee.findMany({
+        where: {
+          companyId: companyId // 🔒 SECURED
+        },
         select: {
           id: true,
           name: true,
@@ -35,10 +55,13 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get current month payroll runs
+      // Get current month payroll runs FROM THIS COMPANY
       prisma.payrollRun.findMany({
         where: {
-          monthYear: currentMonth
+          monthYear: currentMonth,
+          employee: {
+            companyId: companyId // 🔒 SECURED through relation
+          }
         },
         include: {
           employee: {
@@ -53,8 +76,13 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get recent payroll runs for activity feed
+      // Get recent payroll runs for activity feed FROM THIS COMPANY
       prisma.payrollRun.findMany({
+        where: {
+          employee: {
+            companyId: companyId // 🔒 SECURED through relation
+          }
+        },
         take: 10,
         include: {
           employee: {
@@ -68,8 +96,11 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get recently added employees
+      // Get recently added employees FROM THIS COMPANY
       prisma.employee.findMany({
+        where: {
+          companyId: companyId // 🔒 SECURED
+        },
         take: 5,
         orderBy: {
           createdAt: 'desc'
@@ -81,8 +112,13 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get recent salary adjustments
+      // Get recent salary adjustments FROM THIS COMPANY
       prisma.salaryAdjustment.findMany({
+        where: {
+          employee: {
+            companyId: companyId // 🔒 SECURED through relation
+          }
+        },
         take: 5,
         include: {
           employee: {
@@ -96,10 +132,13 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get all payrolls for this month for stats
+      // Get all payrolls for this month for stats FROM THIS COMPANY
       prisma.payrollRun.findMany({
         where: {
-          monthYear: currentMonth
+          monthYear: currentMonth,
+          employee: {
+            companyId: companyId // 🔒 SECURED through relation
+          }
         },
         select: {
           id: true,
@@ -111,13 +150,30 @@ export async function GET(request: NextRequest) {
         }
       }),
 
-      // Get previous month payrolls for growth calculation
+      // Get previous month payrolls for growth calculation FROM THIS COMPANY
       prisma.payrollRun.findMany({
         where: {
-          monthYear: getPreviousMonth(currentMonth)
+          monthYear: getPreviousMonth(currentMonth),
+          employee: {
+            companyId: companyId // 🔒 SECURED through relation
+          }
         },
         select: {
           netPay: true
+        }
+      }),
+
+      // Check for expiring contracts FROM THIS COMPANY
+      prisma.employee.count({
+        where: {
+          companyId: companyId, // 🔒 SECURED
+          contractType: {
+            in: ['CONTRACT', 'CASUAL']
+          },
+          createdAt: {
+            gte: new Date(new Date().setMonth(new Date().getMonth() - 6))
+          },
+          isActive: true
         }
       })
     ])
@@ -186,7 +242,7 @@ export async function GET(request: NextRequest) {
         type: 'employee_added' as const,
         description: `New employee added: ${employee.name}`,
         timestamp: employee.createdAt.toISOString(),
-        user: 'HR Manager',
+        user: session.user.name || 'HR Manager',
         metadata: {}
       })
     })
@@ -198,7 +254,7 @@ export async function GET(request: NextRequest) {
         type: 'employee_edited' as const,
         description: `Updated salary for ${adjustment.employee.name}`,
         timestamp: adjustment.createdAt.toISOString(),
-        user: 'HR Manager',
+        user: session.user.name || 'HR Manager',
         metadata: {
           oldSalary: adjustment.previousBasicSalary,
           newSalary: adjustment.newBasicSalary
@@ -236,27 +292,12 @@ export async function GET(request: NextRequest) {
       type: 'compliance'
     })
 
-    // Task: Check for expiring contracts (if any employees added in the last 6 months as temp/contract)
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    
-    const contractEmployees = await prisma.employee.count({
-      where: {
-        contractType: {
-          in: ['CONTRACT', 'CASUAL']
-        },
-        createdAt: {
-          gte: sixMonthsAgo
-        },
-        isActive: true
-      }
-    })
-
-    if (contractEmployees > 0) {
+    // Task: Check for expiring contracts
+    if (contractEmployeesCount > 0) {
       upcomingTasks.push({
         id: 'contract_review',
         title: 'Review temporary contracts',
-        description: `${contractEmployees} contract${contractEmployees > 1 ? 's' : ''} may need renewal`,
+        description: `${contractEmployeesCount} contract${contractEmployeesCount > 1 ? 's' : ''} may need renewal`,
         dueDate: getEndOfMonth(currentMonth).toISOString(),
         priority: 'medium' as const,
         type: 'hr'
@@ -283,7 +324,7 @@ export async function GET(request: NextRequest) {
         pendingPayrolls,
         lastPayrollDate,
         monthlyGrowth: Number(monthlyGrowth.toFixed(1)),
-        complianceStatus: 'good' as const // You can implement actual compliance checks
+        complianceStatus: 'good' as const
       },
 
       payrollSummary: {
@@ -300,33 +341,35 @@ export async function GET(request: NextRequest) {
           : null
       },
 
-      recentActivities: recentActivities.slice(0, 8), // Limit to 8 most recent
+      recentActivities: recentActivities.slice(0, 8),
 
       upcomingTasks,
 
       keyMetrics: {
         averageSalary: Math.round(averageSalary),
         totalDeductionsThisMonth: Math.round(totalDeductions),
-        payrollAccuracy: 99.8, // You can implement actual accuracy calculation
-        employeeSatisfaction: 94.5, // This would come from surveys/feedback
-        complianceScore: 98.2 // This would be calculated based on compliance checks
+        payrollAccuracy: 99.8,
+        employeeSatisfaction: 94.5,
+        complianceScore: 98.2
       }
     }
 
-    return NextResponse.json(dashboardData)
+    return NextResponse.json({
+      success: true,
+      data: dashboardData
+    })
 
   } catch (error) {
     console.error('Dashboard API error:', error)
     
     return NextResponse.json(
       { 
+        success: false,
         error: 'Failed to fetch dashboard data',
         message: error instanceof Error ? error.message : 'Unknown error occurred'
       },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -346,7 +389,7 @@ function getNextMonth(monthYear: string): string {
 function getEndOfMonth(monthYear: string): Date {
   const date = new Date(monthYear + '-01')
   date.setMonth(date.getMonth() + 1)
-  date.setDate(0) // Sets to last day of previous month (which is the month we want)
+  date.setDate(0)
   return date
 }
 

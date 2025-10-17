@@ -82,6 +82,7 @@ export interface PayrollCalculationResult {
     total: number
   }
   calculations: {
+    taxableIncome: any
     workingDays: number
     dailyRate: number
     hourlyRate: number

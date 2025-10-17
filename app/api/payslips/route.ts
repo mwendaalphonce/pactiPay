@@ -81,5 +81,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
-api/payroll/[id]/route.ts

@@ -8,9 +8,7 @@ import { KRA_PIN_PATTERN, NATIONAL_ID_PATTERN, BANK_ACCOUNT_PATTERN } from '@/li
  * Using Zod for runtime validation and TypeScript inference
  */
 
-// Employee validation schema
-// Replace your employeeSchema with this updated version:
-
+// Employee validation schema with P10 fields
 export const employeeSchema = z.object({
   name: z.string()
     .min(2, 'Name must be at least 2 characters')
@@ -28,8 +26,22 @@ export const employeeSchema = z.object({
   employeeNumber: z.string()
     .min(1, 'Employee number is required')
     .max(20, 'Employee number must not exceed 20 characters')
-    .nullable()  // Allow null
-    .optional(), // Allow undefined
+    .nullable()
+    .optional(),
+  
+  email: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  
+  phoneNumber: z.string()
+    .regex(/^(\+254|0)[17]\d{8}$/, 'Invalid Kenyan phone number')
+    .optional()
+    .or(z.literal('')),
+  
+  address: z.string()
+    .max(200, 'Address must not exceed 200 characters')
+    .optional(),
   
   bankName: z.string()
     .min(2, 'Bank name must be at least 2 characters')
@@ -43,6 +55,11 @@ export const employeeSchema = z.object({
     .regex(BANK_ACCOUNT_PATTERN, 'Bank account must be 10-16 digits')
     .min(10, 'Bank account must be at least 10 digits')
     .max(16, 'Bank account must not exceed 16 digits'),
+  
+  swiftCode: z.string()
+    .regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/, 'Invalid SWIFT code format')
+    .optional()
+    .or(z.literal('')),
   
   basicSalary: z.number()
     .min(15201, 'Basic salary must meet minimum wage requirement (KSh 15,201 for Nairobi)')
@@ -73,9 +90,101 @@ export const employeeSchema = z.object({
   }).or(z.enum(['permanent', 'contract', 'casual', 'intern']))
   .transform((val) => val.toUpperCase() as 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'),
   
-  // Add isActive to the schema
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
+  
+  // ========== P10-SPECIFIC FIELDS ==========
+  
+  // Residential & Employment Type
+  residentialStatus: z.enum(['RESIDENT', 'NON_RESIDENT'], {
+    errorMap: () => ({ message: 'Residential status must be RESIDENT or NON_RESIDENT' })
+  }).default('RESIDENT'),
+  
+  employeeType: z.enum(['PRIMARY', 'SECONDARY'], {
+    errorMap: () => ({ message: 'Employee type must be PRIMARY or SECONDARY' })
+  }).default('PRIMARY'),
+  
+  // Allowances Breakdown (for P10 reporting)
+  housingAllowance: z.number()
+    .min(0, 'Housing allowance cannot be negative')
+    .max(2000000, 'Housing allowance seems unusually high')
+    .default(0),
+  
+  transportAllowance: z.number()
+    .min(0, 'Transport allowance cannot be negative')
+    .max(500000, 'Transport allowance seems unusually high')
+    .default(0),
+  
+  leavePay: z.number()
+    .min(0, 'Leave pay cannot be negative')
+    .max(1000000, 'Leave pay seems unusually high')
+    .default(0),
+  
+  otherAllowances: z.number()
+    .min(0, 'Other allowances cannot be negative')
+    .max(2000000, 'Other allowances seem unusually high')
+    .default(0),
+  
+  // Pension/Retirement Information
+  pensionScheme: z.boolean()
+    .default(false),
+  
+  pensionSchemeNo: z.string()
+    .max(50, 'Pension scheme number must not exceed 50 characters')
+    .optional()
+    .or(z.literal('')),
+  
+  // Housing/Accommodation Benefits
+  housingBenefit: z.enum([
+    'NOT_PROVIDED',
+    'EMPLOYER_OWNED',
+    'EMPLOYER_RENTED',
+    'AGRICULTURE_FARM'
+  ], {
+    errorMap: () => ({ message: 'Invalid housing benefit type' })
+  }).default('NOT_PROVIDED'),
+  
+  valueOfQuarters: z.number()
+    .min(0, 'Value of quarters cannot be negative')
+    .max(5000000, 'Value of quarters seems unusually high')
+    .default(0),
+  
+  actualRent: z.number()
+    .min(0, 'Actual rent cannot be negative')
+    .max(5000000, 'Actual rent seems unusually high')
+    .default(0),
+  
+  // Tax Relief Information
+  ownerOccupierInterest: z.number()
+    .min(0, 'Owner occupier interest cannot be negative')
+    .max(25000, 'Owner occupier interest relief is capped at KSh 25,000/month')
+    .default(0),
 })
+.refine(
+  (data) => {
+    // If pension scheme is true, pension scheme number must be provided
+    if (data.pensionScheme && !data.pensionSchemeNo?.trim()) {
+      return false
+    }
+    return true
+  },
+  {
+    message: 'Pension scheme registration number is required when enrolled in a pension scheme',
+    path: ['pensionSchemeNo']
+  }
+)
+.refine(
+  (data) => {
+    // If housing benefit is provided, value of quarters should be specified
+    if (data.housingBenefit !== 'NOT_PROVIDED' && data.valueOfQuarters === 0) {
+      return false
+    }
+    return true
+  },
+  {
+    message: 'Value of quarters must be specified when housing benefit is provided',
+    path: ['valueOfQuarters']
+  }
+)
 
 // Payroll input validation schema
 export const payrollInputSchema = z.object({
@@ -125,6 +234,24 @@ export const payrollInputSchema = z.object({
   
   bonusDescription: z.string()
     .max(200, 'Bonus description must not exceed 200 characters')
+    .optional()
+})
+
+// P10 Report Query Schema
+export const p10ReportQuerySchema = z.object({
+  month: z.string()
+    .regex(/^(0[1-9]|1[0-2])$/, 'Month must be in MM format (01-12)'),
+  
+  year: z.string()
+    .regex(/^\d{4}$/, 'Year must be in YYYY format')
+    .refine((val) => {
+      const year = parseInt(val)
+      const currentYear = new Date().getFullYear()
+      return year >= 2020 && year <= currentYear + 1
+    }, 'Year must be between 2020 and next year'),
+  
+  format: z.enum(['json', 'csv', 'excel'])
+    .default('excel')
     .optional()
 })
 
@@ -277,6 +404,7 @@ export type PayrollInput = z.infer<typeof payrollInputSchema>
 export type BatchPayrollInput = z.infer<typeof batchPayrollSchema>
 export type EmployeeUpdate = z.infer<typeof employeeUpdateSchema>
 export type PayrollQuery = z.infer<typeof payrollQuerySchema>
+export type P10ReportQuery = z.infer<typeof p10ReportQuerySchema>
 export type CustomDeduction = z.infer<typeof customDeductionSchema>
 export type Bonus = z.infer<typeof bonusSchema>
 export type BankDetails = z.infer<typeof bankDetailsSchema>

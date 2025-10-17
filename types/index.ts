@@ -126,6 +126,10 @@ export interface PayslipData {
     phone: string
     email: string
     kraPin?: string
+    logo?: string | null
+    signatoryName?: string | null
+    signatoryTitle?: string | null
+    signatorySignature?: string | null
   }
   
   // Employee Information

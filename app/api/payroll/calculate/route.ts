@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       overtimeType: validatedData.overtimeType,
       unpaidDays: validatedData.unpaidDays,
       customDeductions: validatedData.customDeductions,
-      bonuses: validatedData.bonuses
+      bonuses: validatedData.bonuses,
     })
     
     // Prepare deductions object for storage
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       customDeductionDescription: validatedData.customDeductionDescription || null,
       totalStatutory: payrollCalculation.deductions.totalStatutory,
       totalDeductions: payrollCalculation.deductions.totalDeductions
+      
     }
     
     // Prepare earnings object

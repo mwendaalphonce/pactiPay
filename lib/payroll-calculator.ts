@@ -224,7 +224,7 @@ function calculateNSSF(grossPay: number): { employee: number; employer: number }
   const pensionablePay = grossPay
   const tier1Limit = 7000
   const tier2Limit = 36000
-  const rate = 0.06x
+  const rate = 0.06
 
   let employeeContribution = 0
 

@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { authOptions } from '@/lib/auth'
+import { getServerSession } from 'next-auth'
 
 const prisma = new PrismaClient()
 
@@ -10,9 +12,25 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.companyId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unauthorized',
+        message: 'You must be logged in to access this resource'
+      },
+      { status: 401 }
+    )
+  }
+
   try {
     const employee = await prisma.employee.findUnique({
-      where: { id: params.id },
+      where: { 
+        id: params.id,
+        companyId: session.user.companyId // Fixed: Moved inside where clause
+      },
       include: {
         payrollRuns: {
           orderBy: {
@@ -58,7 +76,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch employee ',
+        error: 'Failed to fetch employee',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
@@ -71,10 +89,26 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.companyId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unauthorized',
+        message: 'You must be logged in to access this resource'
+      },
+      { status: 401 }
+    )
+  }
+
   try {
-    // Check if employee exists
+    // Check if employee exists and belongs to the company
     const existingEmployee = await prisma.employee.findUnique({
-      where: { id: params.id },
+      where: { 
+        id: params.id,
+        companyId: session.user.companyId
+      },
       include: {
         _count: {
           select: {
@@ -111,7 +145,8 @@ export async function DELETE(
         entityType: 'Employee',
         entityId: params.id,
         oldValues: existingEmployee,
-        newValues: { isActive: false }
+        newValues: { isActive: false },
+        companyId: session.user.companyId
       }
     })
 
@@ -139,11 +174,43 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.companyId) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unauthorized',
+        message: 'You must be logged in to access this resource'
+      },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const { action } = body
 
     if (action === 'reactivate') {
+      // Verify employee belongs to the company
+      const existingEmployee = await prisma.employee.findUnique({
+        where: {
+          id: params.id,
+          companyId: session.user.companyId
+        }
+      })
+
+      if (!existingEmployee) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Employee not found',
+            message: 'The specified employee does not exist'
+          },
+          { status: 404 }
+        )
+      }
+
       const employee = await prisma.employee.update({
         where: { id: params.id },
         data: {
@@ -157,7 +224,8 @@ export async function PATCH(
           action: 'REACTIVATE_EMPLOYEE',
           entityType: 'Employee',
           entityId: params.id,
-          newValues: { isActive: true }
+          newValues: { isActive: true },
+          companyId: session.user.companyId
         }
       })
 

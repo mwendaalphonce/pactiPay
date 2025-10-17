@@ -7,14 +7,33 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 
-// GET - Fetch all employees or filter by query params
+// GET - Fetch employees (SECURED BY COMPANY)
 export async function GET(request: NextRequest) {
   try {
+    // 🔒 SECURITY: Get authenticated user's session
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+          message: 'You must be associated with a company to view employees'
+        },
+        { status: 401 }
+      )
+    }
+    
+    const companyId = session.user.companyId
+    
     const { searchParams } = new URL(request.url)
     const isActive = searchParams.get('isActive')
     const contractType = searchParams.get('contractType')
 
-    const whereClause: any = {}
+    // 🔒 CRITICAL: Start with companyId filter
+    const whereClause: any = {
+      companyId: companyId // ALWAYS filter by user's company
+    }
     
     if (isActive !== null) {
       whereClause.isActive = isActive === 'true'
@@ -57,8 +76,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create a new employee
-// POST - Create a new employee
+// POST - Create a new employee (ALREADY SECURED ✅)
 export async function POST(request: NextRequest) {
   try {
     // Get the authenticated user's session
@@ -82,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Validate the input data
     const validatedData = employeeSchema.parse(body)
     
-    // Check for duplicate KRA PIN
+    // Check for duplicate KRA PIN (within same company)
     const existingKraPin = await prisma.employee.findUnique({
       where: { 
         companyId_kraPin: {
@@ -103,7 +121,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Check for duplicate National ID
+    // Check for duplicate National ID (within same company)
     const existingNationalId = await prisma.employee.findUnique({
       where: { 
         companyId_nationalId: {
@@ -124,7 +142,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Check for duplicate Employee Number if provided
+    // Check for duplicate Employee Number if provided (within same company)
     if (validatedData.employeeNumber) {
       const existingEmployeeNumber = await prisma.employee.findUnique({
         where: { 
@@ -212,10 +230,25 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update an existing employee
-// PUT - Update an existing employee
+// PUT - Update an existing employee (SECURED BY COMPANY)
 export async function PUT(request: NextRequest) {
   try {
+    // 🔒 SECURITY: Get authenticated user's session
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+          message: 'You must be associated with a company to update employees'
+        },
+        { status: 401 }
+      )
+    }
+    
+    const companyId = session.user.companyId
+    
     const body = await request.json()
     const { id, ...updateData } = body
     
@@ -230,9 +263,12 @@ export async function PUT(request: NextRequest) {
       )
     }
     
-    // Check if employee exists
-    const existingEmployee = await prisma.employee.findUnique({
-      where: { id }
+    // 🔒 CRITICAL: Check if employee exists AND belongs to user's company
+    const existingEmployee = await prisma.employee.findFirst({
+      where: { 
+        id: id,
+        companyId: companyId // VERIFY ownership
+      }
     })
     
     if (!existingEmployee) {
@@ -240,19 +276,20 @@ export async function PUT(request: NextRequest) {
         {
           success: false,
           error: 'Employee not found',
-          message: 'The specified employee does not exist'
+          message: 'The specified employee does not exist or does not belong to your company'
         },
         { status: 404 }
       )
     }
     
-    // Validate the update data (now isActive is in the schema)
+    // Validate the update data
     const validatedData = employeeSchema.partial().parse(updateData)
     
-    // Check for duplicate KRA PIN (if being updated)
+    // Check for duplicate KRA PIN (if being updated, within same company)
     if (validatedData.kraPin && validatedData.kraPin.toUpperCase() !== existingEmployee.kraPin) {
       const duplicateKraPin = await prisma.employee.findFirst({
         where: {
+          companyId: companyId, // Within same company
           kraPin: validatedData.kraPin.toUpperCase(),
           id: { not: id }
         }
@@ -263,17 +300,18 @@ export async function PUT(request: NextRequest) {
           {
             success: false,
             error: 'Duplicate KRA PIN',
-            message: 'Another employee with this KRA PIN already exists'
+            message: 'Another employee in your company with this KRA PIN already exists'
           },
           { status: 409 }
         )
       }
     }
     
-    // Check for duplicate National ID (if being updated)
+    // Check for duplicate National ID (if being updated, within same company)
     if (validatedData.nationalId && validatedData.nationalId !== existingEmployee.nationalId) {
       const duplicateNationalId = await prisma.employee.findFirst({
         where: {
+          companyId: companyId, // Within same company
           nationalId: validatedData.nationalId,
           id: { not: id }
         }
@@ -284,7 +322,7 @@ export async function PUT(request: NextRequest) {
           {
             success: false,
             error: 'Duplicate National ID',
-            message: 'Another employee with this National ID already exists'
+            message: 'Another employee in your company with this National ID already exists'
           },
           { status: 409 }
         )
@@ -342,6 +380,8 @@ export async function PUT(request: NextRequest) {
         action: 'UPDATE_EMPLOYEE',
         entityType: 'Employee',
         entityId: id,
+        userId: session.user.id,
+        userEmail: session.user.email || undefined,
         oldValues: existingEmployee,
         newValues: updatedEmployee
       }

@@ -1,5 +1,8 @@
 // app/api/payroll/[id]/pdf/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { jsPDF } from 'jspdf'
 
 export async function GET(
@@ -10,21 +13,110 @@ export async function GET(
     // Await params in Next.js 15+
     const { id } = await params
 
-    // Fetch payslip data
-    const baseUrl = request.nextUrl.origin
-    const response = await fetch(`${baseUrl}/api/payroll/${id}`)
+    // 🔒 SECURITY: Get authenticated user's session
+    const session = await getServerSession(authOptions)
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch payslip data')
-    }
-    
-    const result = await response.json()
-    
-    if (!result.success || !result.data) {
-      throw new Error('Invalid payslip data')
+    if (!session?.user?.companyId) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No company associated with user' },
+        { status: 401 }
+      )
     }
 
-    const { payslipData } = result.data
+    // ✅ DIRECT DATABASE QUERY - No HTTP fetch!
+    const payrollRun = await prisma.payrollRun.findUnique({
+      where: { id },
+      include: {
+        employee: {
+          include: {
+            company: true
+          }
+        }
+      }
+    })
+
+    if (!payrollRun) {
+      return NextResponse.json(
+        { error: 'Payslip not found' },
+        { status: 404 }
+      )
+    }
+
+    // 🔒 SECURITY: Verify user can only access payroll from their company
+    if (payrollRun.employee.companyId !== session.user.companyId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cannot access payroll from different company' },
+        { status: 403 }
+      )
+    }
+
+    // Get additional data from JSON fields
+    const deductions = (payrollRun.deductions as any) || {}
+    const calculations = (payrollRun.calculations as any) || {}
+
+    // Build payslip data
+    const payslipData = {
+      employee: {
+        id: payrollRun.employee.id,
+        name: payrollRun.employee.name,
+        employeeNumber: payrollRun.employee.employeeNumber || undefined,
+        kraPin: payrollRun.employee.kraPin,
+        nationalId: payrollRun.employee.nationalId,
+        email: payrollRun.employee.email || undefined,
+        phone: payrollRun.employee.phoneNumber || undefined,
+        bankName: payrollRun.employee.bankName,
+        bankAccount: payrollRun.employee.bankAccount,
+        position: undefined, // Add if you have this field
+        department: undefined // Add if you have this field
+      },
+      company: {
+        id: payrollRun.employee.company.id,
+        name: payrollRun.employee.company.companyName,
+        address: payrollRun.employee.company.physicalAddress || 
+                 payrollRun.employee.company.postalAddress || 
+                 'Address not provided',
+        phone: payrollRun.employee.company.phone || 'N/A',
+        email: payrollRun.employee.company.email,
+        kraPin: payrollRun.employee.company.kraPin
+      },
+      payroll: {
+        id: payrollRun.id,
+        monthYear: payrollRun.monthYear,
+        payDate: payrollRun.processedAt.toISOString(),
+        processedDate: payrollRun.createdAt.toISOString(),
+        status: payrollRun.status
+      },
+      earnings: {
+        basicSalary: payrollRun.basicSalary,
+        allowances: payrollRun.allowances,
+        overtime: payrollRun.overtime,
+        overtimeHours: payrollRun.overtimeHours || 0,
+        bonuses: payrollRun.bonuses,
+        bonusDescription: payrollRun.bonusDescription || undefined,
+        grossPay: payrollRun.grossPay
+      },
+      deductions: {
+        nssf: payrollRun.nssf,
+        shif: payrollRun.shif,
+        housingLevy: payrollRun.housingLevy,
+        totalAllowable: payrollRun.nssf + payrollRun.shif + payrollRun.housingLevy,
+        taxableIncome: payrollRun.taxableIncome,
+        grossTax: deductions.grossTax || calculations.grossTax || 0,
+        personalRelief: deductions.personalRelief || calculations.personalRelief || 2400,
+        insuranceRelief: deductions.insuranceRelief || calculations.insuranceRelief || 0,
+        paye: payrollRun.paye,
+        customDeductions: payrollRun.customDeductions,
+        customDeductionDescription: deductions.customDeductionDescription || undefined,
+        totalDeductions: payrollRun.totalDeductions
+      },
+      netPay: payrollRun.netPay,
+      additionalInfo: {
+        unpaidDays: payrollRun.unpaidDays || undefined,
+        unpaidDeduction: payrollRun.unpaidDeduction || undefined,
+        effectiveTaxRate: calculations.effectiveTaxRate || 
+                         (payrollRun.grossPay > 0 ? (payrollRun.paye / payrollRun.grossPay * 100) : 0)
+      }
+    }
 
     // Create PDF with jsPDF
     const doc = new jsPDF({
@@ -42,7 +134,7 @@ export async function GET(
     // Set up response headers
     const headers = new Headers()
     headers.set('Content-Type', 'application/pdf')
-    headers.set('Content-Disposition', `attachment; filename="payslip-${payslipData.payroll.monthYear}-${payslipData.employee.name}.pdf"`)
+    headers.set('Content-Disposition', `attachment; filename="payslip-${payslipData.payroll.monthYear}-${payslipData.employee.name.replace(/\s+/g, '-')}.pdf"`)
 
     return new NextResponse(pdfBuffer, { 
       status: 200,
@@ -82,41 +174,66 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
   const rightMargin = 195
   const pageWidth = 210
 
-  // Company Header
-  doc.setFontSize(20)
-  doc.setFont('helvetica', 'bold')
-  doc.text(payslipData.company.name, pageWidth / 2, yPos, { align: 'center' })
-  yPos += 7
-
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.text(payslipData.company.address, pageWidth / 2, yPos, { align: 'center' })
-  yPos += 5
-  doc.text(`${payslipData.company.phone} • ${payslipData.company.email}`, pageWidth / 2, yPos, { align: 'center' })
-  yPos += 5
-
-  if (payslipData.company.kraPin) {
-    doc.text(`KRA PIN: ${payslipData.company.kraPin}`, pageWidth / 2, yPos, { align: 'center' })
-    yPos += 5
-  }
-
-  yPos += 5
+  // Two Column Header - Company Info (Left) | Payslip Info (Right)
+  const headerStartY = yPos
+  
+  // LEFT SIDE - Company Information
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  doc.text('PAYSLIP', pageWidth / 2, yPos, { align: 'center' })
-  yPos += 7
+  doc.text(payslipData.company.name.toUpperCase(), leftMargin, yPos)
+  yPos += 6
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(payslipData.company.address, leftMargin, yPos)
+  yPos += 4
+  doc.text(payslipData.company.phone, leftMargin, yPos)
+  yPos += 4
+  doc.text(payslipData.company.email, leftMargin, yPos)
+  yPos += 4
+
+  if (payslipData.company.kraPin) {
+    doc.setFont('helvetica', 'bold')
+    doc.text(`KRA PIN: `, leftMargin, yPos)
+     doc.setTextColor(37, 99, 235) 
+    doc.setFont('helvetica', 'normal')
+    doc.text(payslipData.company.kraPin, leftMargin + 17, yPos)
+    yPos += 4
+  }
+
+  // RIGHT SIDE - Payslip Information
+  let rightYPos = headerStartY
+  
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  // Blue color for PAYSLIP
+  doc.text('PAYSLIP', rightMargin, rightYPos, { align: 'right' })
+  rightYPos += 8
 
   doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(0, 0, 0)
+  doc.text(getMonthYearDisplay(payslipData.payroll.monthYear), rightMargin, rightYPos, { align: 'right' })
+  rightYPos += 6
+
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text(getMonthYearDisplay(payslipData.payroll.monthYear), pageWidth / 2, yPos, { align: 'center' })
-  yPos += 10
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Pay Date: ${formatDate(payslipData.payroll.payDate)}`, rightMargin, rightYPos, { align: 'right' })
+  rightYPos += 4
+  doc.text(`Processed: ${formatDate(payslipData.payroll.processedDate)}`, rightMargin, rightYPos, { align: 'right' })
+  
+  doc.setTextColor(0, 0, 0)
+  
+  // Reset yPos to the maximum of both columns
+  yPos = Math.max(yPos, rightYPos) + 8
 
   // Horizontal line
-  doc.setLineWidth(0.5)
+  doc.setLineWidth(0.1)
   doc.line(leftMargin, yPos, rightMargin, yPos)
   yPos += 8
 
-  // Employee Information (Two Columns)
+  // Employee Information Section
   const leftColX = leftMargin
   const rightColX = 110
   let leftY = yPos
@@ -124,14 +241,18 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
+  doc.setTextColor(37, 99, 235)
   doc.text('EMPLOYEE INFORMATION', leftColX, leftY)
+  doc.setTextColor(0, 0, 0)
   leftY += 6
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   
   const addLeftRow = (label: string, value: string) => {
+    doc.setTextColor(100, 100, 100)
     doc.text(`${label}`, leftColX, leftY)
+    doc.setTextColor(0, 0, 0)
     doc.text(value, leftColX + 40, leftY)
     leftY += 5
   }
@@ -149,25 +270,27 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
     addLeftRow('Department:', payslipData.employee.department)
   }
 
-  // Right Column
+  // Right Column - Bank Information
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
-  doc.text('PAYMENT INFORMATION', rightColX, rightY)
+  doc.setTextColor(37, 99, 235)
+  doc.text('BANK INFORMATION', rightColX, rightY)
+  doc.setTextColor(0, 0, 0)
   rightY += 6
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
 
   const addRightRow = (label: string, value: string) => {
+    doc.setTextColor(100, 100, 100)
     doc.text(`${label}`, rightColX, rightY)
+    doc.setTextColor(0, 0, 0)
     doc.text(value, rightColX + 35, rightY)
     rightY += 5
   }
 
   addRightRow('Bank:', payslipData.employee.bankName)
   addRightRow('Account:', payslipData.employee.bankAccount)
-  addRightRow('Pay Date:', formatDate(payslipData.payroll.payDate))
-  addRightRow('Processed:', formatDate(payslipData.payroll.processedDate))
 
   yPos = Math.max(leftY, rightY) + 8
 
@@ -180,7 +303,7 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
   }
 
   // Earnings Section
-  doc.setLineWidth(0.5)
+  doc.setLineWidth(0.1)
   doc.line(leftMargin, yPos, rightMargin, yPos)
   yPos += 5
 
@@ -283,7 +406,7 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
   // Net Pay Box
   doc.setFillColor(219, 234, 254)
   doc.setDrawColor(59, 130, 246)
-  doc.setLineWidth(0.5)
+  doc.setLineWidth(0.1)
   doc.rect(leftMargin, yPos, rightMargin - leftMargin, 15, 'FD')
   
   doc.setTextColor(30, 58, 138)
@@ -300,9 +423,6 @@ function generatePayslipPDF(doc: jsPDF, payslipData: any) {
   
   doc.setTextColor(0, 0, 0)
   yPos += 20
-
-  // Employer Contributions
- 
 
   // Footer
   doc.setFontSize(7)

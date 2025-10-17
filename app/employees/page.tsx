@@ -9,9 +9,20 @@ import EmployeeForm from '@/components/employees/EmployeeForm'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { UserPlus, Download, Upload } from 'lucide-react'
 import { Employee, EmployeeFormData } from '@/types'
 import { useToast } from '../providers' 
+
+const ITEMS_PER_PAGE = 10
 
 export default function EmployeesPage() {
   const router = useRouter()
@@ -23,35 +34,44 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   // Load employees data
   useEffect(() => {
-    const loadEmployees = async () => {
-      try {
-        const response = await fetch('/api/employees?isActive=true')
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch employees')
-        }
-        
-        const result = await response.json()
-        
-        // Handle the API response structure: { success: true, data: [...] }
-        if (result.success && result.data) {
-          setEmployees(result.data)
-        } else {
-          throw new Error(result.message || 'Failed to load employees')
-        }
-      } catch (error) {
-        console.error('Error loading employees:', error)
-        showToast(error instanceof Error ? error.message : 'Failed to load employees', 'error')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadEmployees()
-  }, [showToast])
+  }, [currentPage])
+
+  const loadEmployees = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/employees?isActive=true&page=${currentPage}&limit=${ITEMS_PER_PAGE}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch employees')
+      }
+      
+      const result = await response.json()
+      
+      // Handle the API response structure: { success: true, data: [...] }
+      if (result.success && result.data) {
+        setEmployees(result.data)
+        
+        // Set total count if provided by API
+        if (result.pagination?.total) {
+          setTotalCount(result.pagination.total)
+        }
+      } else {
+        throw new Error(result.message || 'Failed to load employees')
+      }
+    } catch (error) {
+      console.error('Error loading employees:', error)
+      showToast(error instanceof Error ? error.message : 'Failed to load employees', 'error')
+      setEmployees([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Handle add new employee
   const handleAddEmployee = () => {
@@ -91,7 +111,6 @@ export default function EmployeesPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || result.error || 'Failed to save employee')
-        
       }
 
       const savedEmployee = result.data
@@ -103,9 +122,9 @@ export default function EmployeesPage() {
         )
         showToast(`Employee ${formData.name} updated successfully`, 'success')
       } else {
-        // Add new employee to state
-        setEmployees(prev => [savedEmployee, ...prev])
+        // Add new employee - reload to update pagination
         showToast(`Employee ${formData.name} added successfully`, 'success')
+        await loadEmployees()
       }
 
       setIsFormOpen(false)
@@ -134,10 +153,10 @@ export default function EmployeesPage() {
         throw new Error(result.message || result.error || 'Failed to delete employee')
       }
 
-      // Remove from state (soft delete marks as inactive)
-      setEmployees(prev => prev.filter(emp => emp.id !== employeeId))
+      // Reload employees to update pagination
       showToast(result.message || `Employee ${employee.name} deactivated successfully`, 'success')
       setDeleteConfirmId(null)
+      await loadEmployees()
     } catch (error: any) {
       console.error('Error deleting employee:', error)
       showToast(error.message || 'Failed to delete employee', 'error')
@@ -148,6 +167,11 @@ export default function EmployeesPage() {
   const handleExportEmployees = async () => {
     try {
       showToast('Exporting employees data...', 'info')
+      
+      // Fetch all employees for export (without pagination)
+      const response = await fetch('/api/employees?isActive=true&limit=10000')
+      const result = await response.json()
+      const allEmployees = result.success ? result.data : employees
       
       // Create CSV from current employees data
       const csvHeaders = [
@@ -165,7 +189,7 @@ export default function EmployeesPage() {
         'Status'
       ].join(',')
       
-      const csvRows = employees.map(emp => [
+      const csvRows = allEmployees.map((emp: Employee) => [
         emp.name,
         emp.kraPin,
         emp.nationalId,
@@ -206,6 +230,45 @@ export default function EmployeesPage() {
     showToast('Import feature coming soon', 'info')
   }
 
+  // Calculate total pages
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = []
+    const maxVisiblePages = 5
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i)
+        }
+        pages.push('ellipsis')
+        pages.push(totalPages)
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1)
+        pages.push('ellipsis')
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i)
+        }
+      } else {
+        pages.push(1)
+        pages.push('ellipsis')
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i)
+        }
+        pages.push('ellipsis')
+        pages.push(totalPages)
+      }
+    }
+    
+    return pages
+  }
+
   // Header actions
   const headerActions = (
     <div className="flex items-center gap-2">
@@ -241,22 +304,68 @@ export default function EmployeesPage() {
           isLoading={isLoading}
         />
 
+        {/* Pagination */}
+        {!isLoading && totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to{' '}
+              {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} employees
+            </div>
+            
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                
+                {getPageNumbers().map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === 'ellipsis' ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page as number)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+
         {/* Employee Form Modal */}
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
-              </DialogTitle>
-            </DialogHeader>
-            <EmployeeForm
-              employee={selectedEmployee || undefined}
-              onSave={handleSaveEmployee}
-              onCancel={() => setIsFormOpen(false)}
-              isLoading={isSubmitting}
-            />
-          </DialogContent>
-        </Dialog>
+    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="text-xl">
+            {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="px-6 pb-6">
+          <EmployeeForm
+            employee={selectedEmployee || undefined}
+            onSave={handleSaveEmployee}
+            onCancel={() => setIsFormOpen(false)}
+            isLoading={isSubmitting}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
 
         {/* Delete Confirmation Modal */}
         {deleteConfirmId && (
