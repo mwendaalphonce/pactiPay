@@ -13,19 +13,19 @@ import {
 
 interface QuickActionsProps {
   onAddEmployee: () => void
-  onRunPayroll: () => void
+ 
   onViewPayslips: () => void
   onDownloadReports: (reportType: 'monthly_payroll' | 'employee_summary' | 'statutory_deductions' | 'p10') => void
-  onViewSettings: () => void
+  
   onViewReports: () => void
 }
 
 export default function QuickActions({ 
   onAddEmployee,
-  onRunPayroll,
+  
   onViewPayslips,
   onDownloadReports,
-  onViewSettings,
+  
   onViewReports
 }: QuickActionsProps) {
   const actions = [
@@ -35,36 +35,21 @@ export default function QuickActions({
       color: 'bg-blue-500 hover:bg-blue-600',
       onClick: onAddEmployee
     },
-    {
-      title: 'Run Payroll',
-      icon: Calculator,
-      color: 'bg-green-500 hover:bg-green-600',
-      onClick: onRunPayroll
-    },
+
     {
       title: 'View Payslips',
       icon: FileText,
       color: 'bg-purple-500 hover:bg-purple-600',
       onClick: onViewPayslips
     },
-    {
-      title: 'Reports',
-      icon: Download,
-      color: 'bg-orange-500 hover:bg-orange-600',
-      onClick: () => onDownloadReports('monthly_payroll')
-    },
+    
     {
       title: 'View Reports',
       icon: BarChart3,
       color: 'bg-indigo-500 hover:bg-indigo-600',
       onClick: onViewReports
     },
-    {
-      title: 'P10 Reports',
-      icon: Download,
-      color: 'bg-orange-500 hover:bg-orange-800',
-      onClick: () => onDownloadReports('p10')
-    }
+   
   ]
 
   return (
@@ -88,7 +73,6 @@ export default function QuickActions({
                 </div>
                 <div className="text-center">
                   <p className="font-medium text-sm">{action.title}</p>
-                  <p className="text-xs text-muted-foreground">{action.description}</p>
                 </div>
               </Button>
             )

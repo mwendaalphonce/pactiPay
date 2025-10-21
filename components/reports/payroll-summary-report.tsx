@@ -11,7 +11,30 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function PayrollSummaryReport({ data }) {
+interface Employee {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface Payslip {
+  id: string;
+  employee: Employee;
+  basicSalary: number;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+}
+
+interface PayrollData {
+  payslips: Payslip[];
+}
+
+interface PayrollSummaryReportProps {
+  data: PayrollData;
+}
+
+export function PayrollSummaryReport({ data }: PayrollSummaryReportProps) {
   const totals = {
     basicSalary: 0,
     grossPay: 0,

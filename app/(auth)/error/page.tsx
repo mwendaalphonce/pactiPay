@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Building2, AlertCircle, Home } from 'lucide-react'
+import Image from 'next/image'
 
 export default function AuthErrorPage() {
   const searchParams = useSearchParams()
@@ -74,11 +75,16 @@ export default function AuthErrorPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg">
-              <Building2 className="w-10 h-10 text-white" />
+            <Image
+            alt="logo"
+            height={76}
+            width={76}
+            src='/logo.png'
+            />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Kenya Payroll System
+            Karimba
           </h1>
         </div>
 

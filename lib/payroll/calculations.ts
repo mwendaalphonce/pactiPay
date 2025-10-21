@@ -35,7 +35,7 @@ export interface Employee {
 export interface PayrollInput {
   employee: Employee
   overtimeHours: number
-  overtimeType: 'weekday' | 'holiday'
+  overtimeType: 'WEEKDAY' | 'HOLIDAY'
   unpaidDays: number
   customDeductions: number
   bonuses: number
@@ -109,7 +109,7 @@ export function calculatePayroll(input: PayrollInput): PayrollCalculationResult 
   const hourlyRate = employee.basicSalary / WORKING_TIME.STANDARD_WORKING_HOURS_PER_MONTH
   
   // Step 2: Calculate overtime
-  const overtimeMultiplier = overtimeType === 'holiday' 
+  const overtimeMultiplier = overtimeType === 'HOLIDAY' 
     ? WORKING_TIME.OVERTIME_HOLIDAY_MULTIPLIER 
     : WORKING_TIME.OVERTIME_WEEKDAY_MULTIPLIER
   const overtimeAmount = overtimeHours * hourlyRate * overtimeMultiplier
@@ -212,6 +212,7 @@ export function calculatePayroll(input: PayrollInput): PayrollCalculationResult 
     },
     calculations: {
       workingDays,
+      taxableIncome,
       dailyRate: Math.round(dailyRate * 100) / 100,
       hourlyRate: Math.round(hourlyRate * 100) / 100,
       unpaidDeduction: Math.round(unpaidDeduction * 100) / 100,

@@ -12,7 +12,7 @@ const runPayrollSchema = z.object({
   overtimeHours: z.number().min(0).default(0),
   overtimeType: z.enum(['weekday', 'holiday', 'WEEKDAY', 'HOLIDAY'])
     .transform(val => val.toUpperCase() as 'WEEKDAY' | 'HOLIDAY')
-    .default('weekday'),
+    .default('WEEKDAY'), // ✅ FIX: Use uppercase default
   unpaidDays: z.number().min(0).max(31).default(0),
   customDeductions: z.number().min(0).default(0),
   customDeductionDescription: z.string().optional().nullable(),
@@ -39,7 +39,7 @@ const batchPayrollSchema = z.object({
     overtimeHours: z.number().min(0).default(0),
     overtimeType: z.enum(['weekday', 'holiday', 'WEEKDAY', 'HOLIDAY'])
       .transform(val => val.toUpperCase() as 'WEEKDAY' | 'HOLIDAY')
-      .default('weekday'),
+      .default('WEEKDAY'), // ✅ FIX: Use uppercase default
     unpaidDays: z.number().min(0).max(31).default(0),
     customDeductions: z.number().min(0).default(0),
     customDeductionDescription: z.string().optional(),
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
         { 
           success: false, 
           error: 'Invalid payroll data',
-          details: error.errors
+          details: error.issues // ✅ FIX: Use .issues not .errors
         },
         { status: 400 }
       )
@@ -252,11 +252,13 @@ async function processSinglePayroll(data: any, companyId: string, userId: string
         totalStatutory: (validatedData.paye! + validatedData.nssf! + validatedData.shif! + validatedData.housingLevy!),
         totalDeductions: validatedData.totalDeductions!
       },
-      netPay: validatedData.netPay!
+      netPay: validatedData.netPay!,
+      calculations: null
     }
   } else {
+    // ✅ FIX: Cast employee to match expected type
     const calculation = calculatePayroll({
-      employee,
+      employee: employee as any, // Type assertion to handle Prisma vs Interface mismatch
       overtimeHours: validatedData.overtimeHours,
       overtimeType: validatedData.overtimeType,
       unpaidDays: validatedData.unpaidDays,
@@ -266,7 +268,9 @@ async function processSinglePayroll(data: any, companyId: string, userId: string
     payrollData = calculation
   }
   
-  // 🔧 FIX: Save taxableIncome and all other fields to their proper columns
+  // ✅ FIX: Ensure calculations is undefined if null (Prisma doesn't accept null for JSON)
+  const calculationsData = payrollData.calculations ? payrollData.calculations : undefined
+  
   const payrollRun = await prisma.payrollRun.create({
     data: {
       employeeId: validatedData.employeeId,
@@ -279,15 +283,14 @@ async function processSinglePayroll(data: any, companyId: string, userId: string
       bonuses: validatedData.bonuses,
       bonusDescription: validatedData.bonusDescription,
       unpaidDays: validatedData.unpaidDays,
-      unpaidDeduction: 0, // Calculate if needed
+      unpaidDeduction: 0,
       grossPay: payrollData.earnings.grossPay,
       
-      // ✅ CRITICAL: Save to dedicated columns
       paye: payrollData.deductions.paye,
       nssf: payrollData.deductions.nssf,
       shif: payrollData.deductions.shif,
       housingLevy: payrollData.deductions.housingLevy,
-      taxableIncome: payrollData.deductions.taxableIncome, // ← THIS WAS MISSING!
+      taxableIncome: payrollData.deductions.taxableIncome,
       customDeductions: validatedData.customDeductions,
       totalDeductions: payrollData.deductions.totalDeductions,
       netPay: payrollData.netPay,
@@ -295,7 +298,6 @@ async function processSinglePayroll(data: any, companyId: string, userId: string
       processedBy: userId,
       status: 'PROCESSED',
       
-      // Also save in JSON for detailed breakdown
       deductions: {
         paye: payrollData.deductions.paye,
         nssf: payrollData.deductions.nssf,
@@ -314,7 +316,7 @@ async function processSinglePayroll(data: any, companyId: string, userId: string
         bonuses: validatedData.bonuses,
         grossPay: payrollData.earnings.grossPay
       },
-      calculations: payrollData.calculations || null
+      calculations: calculationsData // ✅ FIX: Use undefined instead of null
     },
     include: {
       employee: {
@@ -374,8 +376,9 @@ async function processBatchPayroll(data: any, companyId: string, userId: string)
         continue
       }
       
+      // ✅ FIX: Cast employee to match expected type
       const payrollCalculation = calculatePayroll({
-        employee,
+        employee: employee as any,
         overtimeHours: employeeData.overtimeHours,
         overtimeType: employeeData.overtimeType,
         unpaidDays: employeeData.unpaidDays,
@@ -383,7 +386,9 @@ async function processBatchPayroll(data: any, companyId: string, userId: string)
         bonuses: employeeData.bonuses
       })
       
-      // 🔧 FIX: Save all fields properly in batch processing too
+      // ✅ FIX: Ensure calculations is undefined if null
+      const calculationsData = payrollCalculation.calculations ? payrollCalculation.calculations : undefined
+      
       const payrollRun = await prisma.payrollRun.create({
         data: {
           employeeId: employeeData.employeeId,
@@ -399,12 +404,11 @@ async function processBatchPayroll(data: any, companyId: string, userId: string)
           unpaidDeduction: 0,
           grossPay: payrollCalculation.earnings.grossPay,
           
-          // ✅ Save to dedicated columns
           paye: payrollCalculation.deductions.paye,
           nssf: payrollCalculation.deductions.nssf,
           shif: payrollCalculation.deductions.shif,
           housingLevy: payrollCalculation.deductions.housingLevy,
-          taxableIncome: payrollCalculation.deductions.taxableIncome, // ← THIS WAS MISSING!
+          taxableIncome: payrollCalculation.deductions.taxableIncome,
           customDeductions: employeeData.customDeductions,
           totalDeductions: payrollCalculation.deductions.totalDeductions,
           netPay: payrollCalculation.netPay,
@@ -430,7 +434,7 @@ async function processBatchPayroll(data: any, companyId: string, userId: string)
             bonuses: employeeData.bonuses,
             grossPay: payrollCalculation.earnings.grossPay
           },
-          calculations: payrollCalculation.calculations || null
+          calculations: calculationsData // ✅ FIX: Use undefined instead of null
         },
         include: {
           employee: {

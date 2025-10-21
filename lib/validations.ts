@@ -85,23 +85,20 @@ export const employeeSchema = z.object({
     })
     .refine((date) => date <= new Date(), 'Start date cannot be in the future'),
   
-  contractType: z.enum(['PERMANENT', 'CONTRACT', 'CASUAL', 'INTERN'], {
-    errorMap: () => ({ message: 'Contract type must be PERMANENT, CONTRACT, CASUAL, or INTERN' })
-  }).or(z.enum(['permanent', 'contract', 'casual', 'intern']))
-  .transform((val) => val.toUpperCase() as 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'),
+  contractType: z.enum(['PERMANENT', 'CONTRACT', 'CASUAL', 'INTERN'])
+    .or(z.enum(['permanent', 'contract', 'casual', 'intern']))
+    .transform((val) => val.toUpperCase() as 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'),
   
   isActive: z.boolean().optional(),
   
   // ========== P10-SPECIFIC FIELDS ==========
   
   // Residential & Employment Type
-  residentialStatus: z.enum(['RESIDENT', 'NON_RESIDENT'], {
-    errorMap: () => ({ message: 'Residential status must be RESIDENT or NON_RESIDENT' })
-  }).default('RESIDENT'),
+  residentialStatus: z.enum(['RESIDENT', 'NON_RESIDENT'])
+    .default('RESIDENT'),
   
-  employeeType: z.enum(['PRIMARY', 'SECONDARY'], {
-    errorMap: () => ({ message: 'Employee type must be PRIMARY or SECONDARY' })
-  }).default('PRIMARY'),
+  employeeType: z.enum(['PRIMARY', 'SECONDARY'])
+    .default('PRIMARY'),
   
   // Allowances Breakdown (for P10 reporting)
   housingAllowance: z.number()
@@ -139,9 +136,8 @@ export const employeeSchema = z.object({
     'EMPLOYER_OWNED',
     'EMPLOYER_RENTED',
     'AGRICULTURE_FARM'
-  ], {
-    errorMap: () => ({ message: 'Invalid housing benefit type' })
-  }).default('NOT_PROVIDED'),
+  ])
+    .default('NOT_PROVIDED'),
   
   valueOfQuarters: z.number()
     .min(0, 'Value of quarters cannot be negative')
@@ -208,9 +204,8 @@ export const payrollInputSchema = z.object({
     .max(100, 'Overtime hours seem excessive (max 100 hours)')
     .default(0),
   
-  overtimeType: z.enum(['weekday', 'holiday'], {
-    errorMap: () => ({ message: 'Overtime type must be weekday or holiday' })
-  }).default('weekday'),
+  overtimeType: z.enum(['weekday', 'holiday'])
+    .default('weekday'),
   
   unpaidDays: z.number()
     .min(0, 'Unpaid days cannot be negative')
@@ -308,9 +303,7 @@ export const customDeductionSchema = z.object({
     .min(3, 'Description must be at least 3 characters')
     .max(200, 'Description must not exceed 200 characters'),
   
-  type: z.enum(['loan', 'advance', 'sacco', 'insurance', 'other'], {
-    errorMap: () => ({ message: 'Deduction type must be loan, advance, sacco, insurance, or other' })
-  }),
+  type: z.enum(['loan', 'advance', 'sacco', 'insurance', 'other']),
   
   isRecurring: z.boolean().default(false),
   
@@ -333,9 +326,7 @@ export const bonusSchema = z.object({
     .min(3, 'Description must be at least 3 characters')
     .max(200, 'Description must not exceed 200 characters'),
   
-  type: z.enum(['performance', 'annual', 'commission', 'overtime_bonus', 'other'], {
-    errorMap: () => ({ message: 'Bonus type must be performance, annual, commission, overtime_bonus, or other' })
-  }),
+  type: z.enum(['performance', 'annual', 'commission', 'overtime_bonus', 'other']),
   
   taxable: z.boolean().default(true),
   

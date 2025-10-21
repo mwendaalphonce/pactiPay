@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Building2, Mail, Lock, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 export default function SignInPage() {
   const router = useRouter()
@@ -124,21 +125,25 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      
       <div className="w-full max-w-md">
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg">
-              <Building2 className="w-10 h-10 text-white" />
+          <div className="flex justify-center">
+            <div className="flex items-center justify-center mb-2">
+              <Image src="/logo.png"
+              alt="Logo"
+              height= {48}
+              width= {48}
+              />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Kenya Payroll System
+          <h1 className="text-3xl font-bold text-blue-700 mb-2  ">
+            KARIMBA
           </h1>
-          <p className="text-gray-600">
-            Sign in to manage your payroll
-          </p>
+          
         </div>
+
 
         {/* Error Alert */}
         {error && (
@@ -198,7 +203,7 @@ export default function SignInPage() {
             </Button>
 
             {/* Divider */}
-            <div className="relative my-6">
+            <div className="relative my-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
               </div>

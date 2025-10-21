@@ -129,9 +129,10 @@ export default function EmployeesPage() {
 
       setIsFormOpen(false)
       setSelectedEmployee(null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving employee:', error)
-      showToast(error.message || 'Failed to save employee', 'error')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save employee'
+      showToast(errorMessage, 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -157,9 +158,10 @@ export default function EmployeesPage() {
       showToast(result.message || `Employee ${employee.name} deactivated successfully`, 'success')
       setDeleteConfirmId(null)
       await loadEmployees()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting employee:', error)
-      showToast(error.message || 'Failed to delete employee', 'error')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete employee'
+      showToast(errorMessage, 'error')
     }
   }
 
@@ -234,8 +236,8 @@ export default function EmployeesPage() {
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
   // Generate page numbers to display
-  const getPageNumbers = () => {
-    const pages = []
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    const pages: (number | 'ellipsis')[] = []
     const maxVisiblePages = 5
     
     if (totalPages <= maxVisiblePages) {
@@ -327,7 +329,7 @@ export default function EmployeesPage() {
                       <PaginationEllipsis />
                     ) : (
                       <PaginationLink
-                        onClick={() => setCurrentPage(page as number)}
+                        onClick={() => setCurrentPage(page)}
                         isActive={currentPage === page}
                         className="cursor-pointer"
                       >
@@ -349,23 +351,23 @@ export default function EmployeesPage() {
         )}
 
         {/* Employee Form Modal */}
-    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-0">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle className="text-xl">
-            {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="px-6 pb-6">
-          <EmployeeForm
-            employee={selectedEmployee || undefined}
-            onSave={handleSaveEmployee}
-            onCancel={() => setIsFormOpen(false)}
-            isLoading={isSubmitting}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-0">
+            <DialogHeader className="px-6 pt-6 pb-4">
+              <DialogTitle className="text-xl">
+                {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="px-6 pb-6">
+              <EmployeeForm
+                employee={selectedEmployee || undefined}
+                onSave={handleSaveEmployee}
+                onCancel={() => setIsFormOpen(false)}
+                isLoading={isSubmitting}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Modal */}
         {deleteConfirmId && (

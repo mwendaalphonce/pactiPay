@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Employee } from '@/types'
 import {
   Table,
   TableBody,
@@ -30,22 +31,6 @@ import {
   Filter
 } from 'lucide-react'
 
-interface Employee {
-  id: string
-  name: string
-  kraPin: string
-  nationalId: string
-  bankName: string
-  bankBranch: string
-  bankAccount: string
-  basicSalary: number
-  allowances: number
-  startDate: string
-  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL'
-  isActive: boolean
-  createdAt: string
-}
-
 interface EmployeeTableProps {
   employees: Employee[]
   onEdit: (employee: Employee) => void
@@ -55,18 +40,22 @@ interface EmployeeTableProps {
   isLoading?: boolean
 }
 
-const contractTypeColors = {
+type ContractType = 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL' | 'INTERN'
+
+const contractTypeColors: Record<ContractType, string> = {
   PERMANENT: 'bg-green-100 text-green-800',
   CONTRACT: 'bg-blue-100 text-blue-800',
   TEMPORARY: 'bg-yellow-100 text-yellow-800',
-  CASUAL: 'bg-gray-100 text-gray-800'
+  CASUAL: 'bg-gray-100 text-gray-800',
+  INTERN: 'bg-purple-100 text-purple-800'
 }
 
-const contractTypeLabels = {
+const contractTypeLabels: Record<ContractType, string> = {
   PERMANENT: 'Permanent',
   CONTRACT: 'Contract',
   TEMPORARY: 'Temporary',
-  CASUAL: 'Casual'
+  CASUAL: 'Casual',
+  INTERN: 'Intern'
 }
 
 export default function EmployeeTable({ 
@@ -138,7 +127,7 @@ export default function EmployeeTable({
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 <Filter className="w-4 h-4 mr-2" />
-                {contractFilter === 'all' ? 'All Types' : contractTypeLabels[contractFilter as keyof typeof contractTypeLabels]}
+                {contractFilter === 'all' ? 'All Types' : contractTypeLabels[contractFilter as ContractType]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -358,4 +347,4 @@ export default function EmployeeTable({
       </CardContent>
     </Card>
   )
-}
+} 

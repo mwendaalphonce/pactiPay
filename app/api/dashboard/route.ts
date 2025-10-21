@@ -4,6 +4,24 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+interface Activity {
+  id: string
+  type: 'payroll_processed' | 'employee_added' | 'employee_edited'
+  description: string
+  timestamp: string
+  user: string
+  metadata: Record<string, any>
+}
+
+interface Task {
+  id: string
+  title: string
+  description: string
+  dueDate: string
+  priority: 'high' | 'medium' | 'low'
+  type: 'payroll' | 'compliance' | 'hr'
+}
+
 export async function GET(request: NextRequest) {
   try {
     // 🔒 SECURITY: Get authenticated user's session
@@ -217,14 +235,14 @@ export async function GET(request: NextRequest) {
       ? totalMonthlyPayroll / activeEmployeesCount 
       : 0
 
-    // Build recent activities from different sources
-    const recentActivities = []
+    // Build recent activities from different sources - ✅ TYPED
+    const recentActivities: Activity[] = []
 
     // Add payroll activities
     recentPayrollRuns.slice(0, 3).forEach(payroll => {
       recentActivities.push({
         id: `payroll_${payroll.id}`,
-        type: 'payroll_processed' as const,
+        type: 'payroll_processed',
         description: `Payroll processed for ${payroll.employee.name} - ${formatMonthYear(payroll.monthYear)}`,
         timestamp: payroll.processedAt.toISOString(),
         user: 'System',
@@ -239,7 +257,7 @@ export async function GET(request: NextRequest) {
     recentEmployees.slice(0, 2).forEach(employee => {
       recentActivities.push({
         id: `employee_${employee.id}`,
-        type: 'employee_added' as const,
+        type: 'employee_added',
         description: `New employee added: ${employee.name}`,
         timestamp: employee.createdAt.toISOString(),
         user: session.user.name || 'HR Manager',
@@ -251,7 +269,7 @@ export async function GET(request: NextRequest) {
     recentAdjustments.slice(0, 2).forEach(adjustment => {
       recentActivities.push({
         id: `adjustment_${adjustment.id}`,
-        type: 'employee_edited' as const,
+        type: 'employee_edited',
         description: `Updated salary for ${adjustment.employee.name}`,
         timestamp: adjustment.createdAt.toISOString(),
         user: session.user.name || 'HR Manager',
@@ -265,8 +283,8 @@ export async function GET(request: NextRequest) {
     // Sort activities by timestamp (most recent first)
     recentActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-    // Generate upcoming tasks based on actual data
-    const upcomingTasks = []
+    // Generate upcoming tasks based on actual data - ✅ TYPED
+    const upcomingTasks: Task[] = []
 
     // Task: Process pending payrolls
     if (pendingPayrolls > 0) {
@@ -275,7 +293,7 @@ export async function GET(request: NextRequest) {
         title: `Process remaining ${pendingPayrolls} payrolls`,
         description: `Complete ${formatMonthYear(currentMonth)} payroll processing`,
         dueDate: getEndOfMonth(currentMonth).toISOString(),
-        priority: pendingPayrolls > 5 ? 'high' as const : 'medium' as const,
+        priority: pendingPayrolls > 5 ? 'high' : 'medium',
         type: 'payroll'
       })
     }
@@ -288,7 +306,7 @@ export async function GET(request: NextRequest) {
       title: 'Generate monthly tax report',
       description: 'Prepare PAYE and statutory deductions report',
       dueDate: taxReportDue.toISOString(),
-      priority: 'medium' as const,
+      priority: 'medium',
       type: 'compliance'
     })
 
@@ -299,7 +317,7 @@ export async function GET(request: NextRequest) {
         title: 'Review temporary contracts',
         description: `${contractEmployeesCount} contract${contractEmployeesCount > 1 ? 's' : ''} may need renewal`,
         dueDate: getEndOfMonth(currentMonth).toISOString(),
-        priority: 'medium' as const,
+        priority: 'medium',
         type: 'hr'
       })
     }

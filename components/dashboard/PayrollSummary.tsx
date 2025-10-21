@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { useRouter } from "next/navigation";
 import { 
   Calendar, 
   Users, 
@@ -14,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { be } from 'zod/v4/locales'
+import Link from 'next/link'
 
 interface PayrollSummaryData {
   currentMonth: string
@@ -84,6 +86,8 @@ export default function PayrollSummary({
   const completionPercentage = data.totalEmployees > 0 
     ? (data.processedEmployees / data.totalEmployees) * 100 
     : 0
+
+ const router = useRouter();
 
   return (
     <Card>
@@ -163,19 +167,26 @@ export default function PayrollSummary({
         {/* Actions */}
         <div className="flex gap-3">
           {data.status === 'not_started' && (
-            <Button onClick={onStartPayroll} className="flex-1">
+            <Button className="flex-1"
+             onClick={() => router.push("/payroll")}
+            >
+              
               Start Payroll Processing
             </Button>
           )}
           {data.status === 'in_progress' && (
-            <Button onClick={onViewDetails} variant="outline" className="flex-1">
+            <Button onClick={onViewDetails} variant="outline" className="flex-1 ">
               Continue Processing
             </Button>
           )}
           {data.status === 'completed' && (
-            <Button onClick={onViewDetails} variant="outline" className="flex-1">
-              View Payroll Details
-            </Button>
+           <Button
+            variant="outline"
+            onClick={() => router.push("/payslips")}
+            className="flex-1"
+          >
+            View Payroll Details
+          </Button>
           )}
           {data.status === 'overdue' && (
             <Button onClick={onStartPayroll} variant="destructive" className="flex-1">

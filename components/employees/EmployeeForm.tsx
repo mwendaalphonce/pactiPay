@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -89,11 +89,50 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
     valueOfQuarters: 0,
     actualRent: 0,
     ownerOccupierInterest: 0,
-    ...employee
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+
+  // Initialize form data when employee prop changes
+  useEffect(() => {
+    if (employee) {
+      // Format the date properly for the date input
+      const formattedDate = employee.startDate 
+        ? new Date(employee.startDate).toISOString().split('T')[0]
+        : ''
+
+      // Calculate individual allowances from total if not provided
+      const totalAllowances = employee.allowances || 0
+      const hasBreakdown = (employee.housingAllowance ?? 0) > 0 || 
+                          (employee.transportAllowance ?? 0) > 0 || 
+                          (employee.leavePay ?? 0) > 0 || 
+                          (employee.otherAllowances ?? 0) > 0
+
+      setFormData({
+        ...employee,
+        startDate: formattedDate,
+        // If editing and no breakdown exists, put all in otherAllowances
+        housingAllowance: employee.housingAllowance ?? 0,
+        transportAllowance: employee.transportAllowance ?? 0,
+        leavePay: employee.leavePay ?? 0,
+        otherAllowances: hasBreakdown ? (employee.otherAllowances ?? 0) : totalAllowances,
+        residentialStatus: employee.residentialStatus ?? 'RESIDENT',
+        employeeType: employee.employeeType ?? 'PRIMARY',
+        pensionScheme: employee.pensionScheme ?? false,
+        pensionSchemeNo: employee.pensionSchemeNo ?? '',
+        housingBenefit: employee.housingBenefit ?? 'NOT_PROVIDED',
+        valueOfQuarters: employee.valueOfQuarters ?? 0,
+        actualRent: employee.actualRent ?? 0,
+        ownerOccupierInterest: employee.ownerOccupierInterest ?? 0,
+        email: employee.email ?? '',
+        phoneNumber: employee.phoneNumber ?? '',
+        address: employee.address ?? '',
+        swiftCode: employee.swiftCode ?? '',
+        employeeNumber: employee.employeeNumber ?? '',
+      })
+    }
+  }, [employee])
 
   const steps = [
     { id: 1, name: 'Personal Info', icon: User },
@@ -129,6 +168,9 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
       case 'startDate':
         if (!value) return 'Start date is required'
         break
+      case 'employeeNumber':
+        if (!value?.trim()) return 'Employee number is required'
+        break
       case 'bankName':
         if (!value?.trim()) return 'Bank name is required'
         break
@@ -148,7 +190,7 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
 
   const validateStep = (step: number): boolean => {
     const stepFields: Record<number, string[]> = {
-      1: ['name', 'kraPin', 'nationalId'],
+      1: ['name', 'kraPin', 'nationalId', 'employeeNumber'],
       2: ['startDate', 'contractType'],
       3: ['basicSalary'],
       4: ['bankName', 'bankBranch', 'bankAccount']
@@ -333,15 +375,26 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
 
             <div className="space-y-1.5">
               <Label htmlFor="employeeNumber" className="text-sm font-medium text-gray-700">
-                Employee Number
+                Employee Number <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="employeeNumber"
                 value={formData.employeeNumber || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, employeeNumber: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, employeeNumber: e.target.value.toUpperCase() }))}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, employeeNumber: true }))
+                  setErrors(prev => ({ ...prev, employeeNumber: validateField('employeeNumber', formData.employeeNumber) }))
+                }}
                 placeholder="EMP001"
+                className={errors.employeeNumber && touched.employeeNumber ? 'border-red-300' : ''}
               />
-              <p className="text-xs text-gray-500">Optional: Internal employee identifier</p>
+              {!errors.employeeNumber && <p className="text-xs text-gray-500">Required: Internal employee identifier</p>}
+              {errors.employeeNumber && touched.employeeNumber && (
+                <div className="flex items-center gap-1 text-red-600 text-xs">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{errors.employeeNumber}</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -880,7 +933,7 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
                 <div>
                   <h4 className="text-sm font-medium text-green-900">Ready to Submit</h4>
                   <p className="text-xs text-green-700 mt-1">
-                    Review all information before creating the employee record
+                    Review all information before {employee ? 'updating' : 'creating'} the employee record
                   </p>
                 </div>
               </div>
@@ -917,7 +970,7 @@ export default function EmployeeForm({ employee, onSave, onCancel, isLoading }: 
             className="bg-green-600 hover:bg-green-700"
           >
             <Save className="w-4 h-4 mr-2" />
-            {isLoading ? 'Saving...' : 'Save Employee'}
+            {isLoading ? 'Saving...' : employee ? 'Update Employee' : 'Save Employee'}
           </Button>
         )}
       </div>

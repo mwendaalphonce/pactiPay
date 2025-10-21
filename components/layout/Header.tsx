@@ -23,7 +23,7 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
   const getCurrentTime = () => {
     return new Date().toLocaleTimeString('en-KE', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 

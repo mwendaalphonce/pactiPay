@@ -8,7 +8,7 @@ const payrollInputSchema = z.object({
   employeeId: z.string(),
   monthYear: z.string().regex(/^\d{4}-\d{2}$/, 'Month year must be in YYYY-MM format'),
   overtimeHours: z.number().min(0).default(0),
-  overtimeType: z.enum(['weekday', 'holiday']).default('weekday'),
+  overtimeType: z.enum(['WEEKDAY', 'HOLIDAY']).default('WEEKDAY'),
   unpaidDays: z.number().min(0).max(31).default(0),
   customDeductions: z.number().min(0).default(0),
   customDeductionDescription: z.string().optional(),
@@ -58,7 +58,14 @@ export async function POST(request: NextRequest) {
     
     // Calculate payroll
     const payrollCalculation = calculatePayroll({
-      employee,
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        kraPin: employee.kraPin,
+        basicSalary: employee.basicSalary,
+        allowances: employee.allowances || 0,
+        contractType: (employee.contractType?.toLowerCase() as 'permanent' | 'contract' | 'casual' | 'intern'),
+      },
       overtimeHours: validatedData.overtimeHours,
       overtimeType: validatedData.overtimeType,
       unpaidDays: validatedData.unpaidDays,
@@ -76,7 +83,6 @@ export async function POST(request: NextRequest) {
       customDeductionDescription: validatedData.customDeductionDescription || null,
       totalStatutory: payrollCalculation.deductions.totalStatutory,
       totalDeductions: payrollCalculation.deductions.totalDeductions
-      
     }
     
     // Prepare earnings object
@@ -120,7 +126,7 @@ export async function POST(request: NextRequest) {
         { 
           success: false, 
           error: 'Validation failed',
-          details: error.errors
+          details: error.issues
         },
         { status: 400 }
       )

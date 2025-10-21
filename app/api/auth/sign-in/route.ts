@@ -60,8 +60,8 @@ export const authOptions: AuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
-        token.hasCompletedOnboarding = user.hasCompletedOnboarding;
-        token.company = user.company;
+        token.hasCompletedOnboarding = user.hasCompletedOnboarding as boolean;
+        token.company = user.companyId;
       }
       return token;
     },

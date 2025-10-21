@@ -18,7 +18,24 @@ const monthNames = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-export function EmployeePayslipList({ payslips }) {
+interface Payroll {
+  month: number;
+  year: number;
+}
+
+interface Payslip {
+  id: string;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+  payroll: Payroll;
+}
+
+interface EmployeePayslipListProps {
+  payslips: Payslip[];
+}
+
+export function EmployeePayslipList({ payslips }: EmployeePayslipListProps) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleDownload = async (payslipId: string) => {
@@ -40,8 +57,8 @@ export function EmployeePayslipList({ payslips }) {
       
       // Get payslip details for filename
       const payslip = payslips.find(p => p.id === payslipId);
-      const month = monthNames[payslip.payroll.month - 1];
-      const year = payslip.payroll.year;
+      const month = payslip ? monthNames[payslip.payroll.month - 1] : "Unknown";
+      const year = payslip ? payslip.payroll.year : "Unknown";
       
       // Set the download attribute with filename
       link.download = `payslip-${month}-${year}.pdf`;

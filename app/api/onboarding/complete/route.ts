@@ -35,7 +35,7 @@ const onboardingSchema = z.object({
   swiftCode: z.string().optional().or(z.literal('')),
   
   // Step 5: Preferences
-  payrollDay: z.number().min(1).max(28).default(25),
+   payrollDay: z.coerce.number().min(1).max(31).default(25),
   signatoryName: z.string().optional().or(z.literal('')),
   signatoryTitle: z.string().optional().or(z.literal('')),
 })
@@ -254,7 +254,7 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return Response.json({
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues
       }, { status: 400 })
     }
     

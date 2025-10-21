@@ -1,6 +1,6 @@
-
 export interface Employee {
   id: string
+  companyId: string
   name: string
   kraPin: string
   nationalId: string
@@ -9,18 +9,60 @@ export interface Employee {
   bankBranch: string
   bankAccount: string
   swiftCode?: string
-  basicSalary: number
-  allowances: number
-  startDate: string | Date
-  contractType: 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'
-  isActive: boolean
   email?: string
   phoneNumber?: string
   address?: string
-  createdAt: string | Date
-  updatedAt: string | Date
-  isDisabled?: boolean
-  insurancePremiums?: InsurancePremium
+  basicSalary: number
+  allowances: number
+  startDate: string 
+  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL' | 'INTERN' // ✅ FIX: Uppercase to match Prisma
+  isActive: boolean
+  residentialStatus: 'RESIDENT' | 'NON_RESIDENT'
+  employeeType: 'PRIMARY' | 'SECONDARY'
+  housingAllowance?: number
+  transportAllowance?: number
+  leavePay?: number
+  otherAllowances?: number
+  pensionScheme: boolean
+  pensionSchemeNo?: string
+  housingBenefit: 'NOT_PROVIDED' | 'EMPLOYER_OWNED' | 'EMPLOYER_RENTED' | 'AGRICULTURE_FARM'
+  valueOfQuarters?: number
+  actualRent?: number
+  ownerOccupierInterest?: number
+  createdAt: string 
+  updatedAt: string
+}
+
+// Form data type - excludes fields managed by the system
+export interface EmployeeFormData {
+  id?: string
+  name: string
+  kraPin: string
+  nationalId: string
+  employeeNumber?: string
+  bankName: string
+  bankBranch: string
+  bankAccount: string
+  swiftCode?: string
+  email?: string
+  phoneNumber?: string
+  address?: string
+  basicSalary: number
+  allowances: number
+  startDate: string
+  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL' | 'INTERN' // ✅ FIX: Uppercase
+  residentialStatus?: 'RESIDENT' | 'NON_RESIDENT'
+  employeeType?: 'PRIMARY' | 'SECONDARY'
+  housingAllowance?: number
+  transportAllowance?: number
+  leavePay?: number
+  otherAllowances?: number
+  pensionScheme?: boolean
+  pensionSchemeNo?: string
+  housingBenefit?: 'NOT_PROVIDED' | 'EMPLOYER_OWNED' | 'EMPLOYER_RENTED' | 'AGRICULTURE_FARM'
+  valueOfQuarters?: number
+  actualRent?: number
+  ownerOccupierInterest?: number
 }
 
 export interface InsurancePremium {
@@ -45,7 +87,7 @@ export interface PayrollRun {
   
   // Overtime Details
   overtimeHours: number
-  overtimeType: 'WEEKDAY' | 'HOLIDAY'
+  overtimeType: 'WEEKDAY' | 'HOLIDAY' // ✅ FIX: Uppercase to match Prisma
   
   // Bonus Details
   bonusDescription?: string
@@ -79,8 +121,8 @@ export interface PayrollRun {
   status: 'DRAFT' | 'PROCESSING' | 'PROCESSED' | 'APPROVED' | 'PAID' | 'CANCELLED'
   
   // Timestamps
-  createdAt: string | Date
-  updatedAt: string | Date
+  createdAt: string 
+  updatedAt: string 
 }
 
 export interface PayrollDeductions {
@@ -88,6 +130,7 @@ export interface PayrollDeductions {
   nssf: number
   shif: number
   housingLevy: number
+  taxableIncome: number // ✅ Added - was missing
   customDeductions: number
   customDeductionDescription?: string
   totalStatutory: number
@@ -112,6 +155,7 @@ export interface PayrollCalculations {
   hourlyRate: number
   unpaidDeduction: number
   effectiveTaxRate: number
+  taxableIncome?: number // ✅ Added for clarity
   // Employer contributions
   nssfEmployer?: number
   shifEmployer?: number
@@ -121,10 +165,11 @@ export interface PayrollCalculations {
 export interface PayslipData {
   // Company Information
   company: {
+    id: string
     name: string
-    address: string
-    phone: string
-    email: string
+    address?: string
+    phone?: string
+    email?: string
     kraPin?: string
     logo?: string | null
     signatoryName?: string | null
@@ -138,19 +183,23 @@ export interface PayslipData {
     name: string
     kraPin: string
     nationalId: string
-    employeeNumber?: string
-    bankName: string
-    bankAccount: string
+    employeeNumber?: string | null
+    email?: string | null
+    phone?: string | null
+    bankName?: string | null
+    bankAccount?: string | null
     position?: string
     department?: string
   }
   
   // Payroll Information
   payroll: {
+    id: string
     monthYear: string
     payPeriod: string // e.g., "January 2025"
     payDate: string
     processedDate: string
+    status: 'DRAFT' | 'PROCESSING' | 'PROCESSED' | 'APPROVED' | 'PAID' | 'CANCELLED'
   }
   
   // Earnings

@@ -14,8 +14,10 @@ import {
   X,
   Building2,
   Settings,
-  HelpCircle
+  HelpCircle,
+  FileBarChart 
 } from 'lucide-react'
+import Image from 'next/image'
 
 const navigationItems = [
   {
@@ -37,6 +39,11 @@ const navigationItems = [
     name: 'Payslips',
     href: '/payslips',
     icon: FileText
+  },
+  {
+    name: 'Reports',
+    href: '/reports',
+    icon: FileBarChart 
   }
 ]
 
@@ -55,9 +62,14 @@ export default function Navigation() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
-              <Building2 className="h-8 w-8 text-blue-600" />
+              <Image
+              src='/logoblue.png'
+              alt='logo'
+              height={48}
+              width={48}
+              />
               <span className="font-bold text-xl text-gray-900">
-                Kenya Payroll
+                KARIMBA
               </span>
             </Link>
           </div>
@@ -123,7 +135,7 @@ export default function Navigation() {
                   href={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    'block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2',
+                    'px-3 py-2 rounded-md text-base font-medium flex items-center gap-2',
                     isActive
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'

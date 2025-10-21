@@ -283,8 +283,8 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id?: string
-    hasCompletedOnboarding?: boolean
+    id: string
+    hasCompletedOnboarding: boolean
     companyId?: string | null
     company?: any
     roles?: string[]

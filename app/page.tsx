@@ -32,9 +32,9 @@ interface DashboardStats {
   totalPayroll: number
   payslipsGenerated: number
   pendingPayrolls: number
-  lastPayrollDate: string | null
+  lastPayrollDate?: string 
   monthlyGrowth: number
-  complianceStatus: 'good' | 'warning' | 'critical'
+  complianceStatus: 'good' | 'warning' | 'error'
 }
 
 interface PayrollSummaryData {
@@ -46,7 +46,7 @@ interface PayrollSummaryData {
   totalDeductions: number
   status: 'not_started' | 'in_progress' | 'completed'
   dueDate: string
-  lastProcessedDate: string | null
+  lastProcessedDate: string 
 }
 
 interface RecentActivity {
@@ -83,6 +83,20 @@ interface DashboardData {
   keyMetrics: KeyMetrics
 }
 
+const normalizeData = (data: any): DashboardData => {
+  return {
+    ...data,
+    stats: {
+      ...data.stats,
+      lastPayrollDate: data.stats.lastPayrollDate ?? undefined
+    },
+    payrollSummary: {
+      ...data.payrollSummary,
+      lastProcessedDate: data.payrollSummary.lastProcessedDate ?? undefined
+    }
+  }
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
@@ -114,8 +128,11 @@ export default function Dashboard() {
         if (!result.success) {
           throw new Error(result.message || 'Failed to load dashboard data')
         }
+
         
-        setDashboardData(result.data) // Access result.data instead of result directly
+        
+    // Normalize the data to convert null to undefined
+        setDashboardData(normalizeData(result.data))
       } catch (err) {
         console.error('Error loading dashboard data:', err)
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
@@ -141,7 +158,7 @@ export default function Dashboard() {
   }
   
 
-  const handleDownloadReports = async () => {
+const handleDownloadReports = async () => {
     try {
       const response = await fetch('/api/payroll/p10/generate', {
         method: 'POST',
@@ -150,7 +167,7 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           type: 'monthly_payroll',
-          month: new Date().toISOString().slice(0, 7) // YYYY-MM format
+          month: new Date().toISOString().slice(0, 7)
         })
       })
 
@@ -245,7 +262,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <Header title="Dashboard" subtitle="Welcome to your Kenya Payroll System overview" />
+        <Header title="Dashboard" subtitle="Welcome to your Payroll System overview" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Card className="border-red-200 bg-red-50">
             <CardContent className="pt-6">
@@ -300,15 +317,13 @@ export default function Dashboard() {
       {/* Header - consistent and clear */}
       <Header 
         title="Dashboard" 
-        subtitle="Welcome to your Kenya Payroll System overview"
+        subtitle="Welcome to your Payroll System overview"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleViewSettings}>
+            <Button variant="outline" size="sm">
               Settings
             </Button>
-            <Button size="sm" onClick={handleRunPayroll}>
-              Run Payroll
-            </Button>
+           
           </div>
         }
       />
@@ -421,11 +436,11 @@ export default function Dashboard() {
             {/* Quick Actions - prominent and accessible */}
             <QuickActions
               onAddEmployee={handleAddEmployee}
-              onRunPayroll={handleRunPayroll}
+              
               onViewPayslips={handleViewPayslips}
               onDownloadReports={handleDownloadReports}
               onViewReports={handleViewReports}
-              onViewSettings={handleViewSettings}
+              
             />
 
             {/* Recent Activity - contextual information */}
@@ -502,7 +517,7 @@ export default function Dashboard() {
                 <Alert>
                   <Calendar className="h-4 w-4" />
                   <AlertDescription>
-                    Monthly tax filing due in 6 days (November 9, 2025).
+                    Monthly tax filing on November 9, 2025.
                     <Button variant="link" className="p-0 h-auto ml-1 font-medium" onClick={handleViewReports}>
                       Generate report →
                     </Button>
@@ -574,7 +589,7 @@ export default function Dashboard() {
       </div>
 
       {/* Footer */}
-    <P10ReportDownload />
+    
       <Footer />
     </div>
   )

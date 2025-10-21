@@ -73,9 +73,9 @@ export async function GET(
         name: payrollRun.employee.name,
         kraPin: payrollRun.employee.kraPin,
         nationalId: payrollRun.employee.nationalId,
-        employeeNumber: payrollRun.employee.employeeNumber || undefined,
-        email: payrollRun.employee.email || undefined,
-        phone: payrollRun.employee.phoneNumber || undefined,
+        employeeNumber: payrollRun.employee.employeeNumber,
+        email: payrollRun.employee.email,
+        phone: payrollRun.employee.phoneNumber,
         bankName: payrollRun.employee.bankName,
         bankAccount: payrollRun.employee.bankAccount,
         // Uncomment if you have these fields in your schema

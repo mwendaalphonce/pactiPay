@@ -87,7 +87,8 @@ interface PayrollCalculation {
     grossTax: number
     personalRelief: number
     insuranceRelief: number
-    netPaye: number
+    netTax: number
+    effectiveRate: number
     bands: Array<{
       description: string
       rate: number
