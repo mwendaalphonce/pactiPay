@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { PrismaClient } from "@prisma/client";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -9,7 +9,8 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== "ADMIN") {
+    // Fixed: Changed from session.user.role to session.user.roles
+    if (!session || !session.user.roles?.includes("ADMIN")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -21,13 +22,16 @@ export async function POST(request: Request) {
     // Create new company
     const company = await prisma.company.create({
       data: {
-        name: data.name,
-        email: data.email || null,
-        phoneNumber: data.phoneNumber || null,
-        address: data.address || null,
-        kraPin: data.kraPin || null,
+        companyName: data.companyName,
+        email: data.email,
+        kraPin: data.kraPin,
+        phone: data.phone || null,
+        physicalAddress: data.physicalAddress || null,
         nhifNumber: data.nhifNumber || null,
         nssfNumber: data.nssfNumber || null,
+        businessRegNo: data.businessRegNo || null,
+        shifNumber: data.shifNumber || null,
+        housingLevy: data.housingLevy || null,
       },
     });
 
@@ -45,7 +49,8 @@ export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== "ADMIN") {
+    // Fixed: Changed from session.user.role to session.user.roles
+    if (!session || !session.user.roles?.includes("ADMIN")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -54,7 +59,7 @@ export async function GET(request: Request) {
 
     const companies = await prisma.company.findMany({
       orderBy: {
-        name: "asc",
+        companyName: "asc",
       },
     });
 
