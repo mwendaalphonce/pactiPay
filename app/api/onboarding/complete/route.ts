@@ -35,16 +35,94 @@ const onboardingSchema = z.object({
   swiftCode: z.string().optional().or(z.literal('')),
   
   // Step 5: Preferences
-   payrollDay: z.coerce.number().min(1).max(31).default(25),
+  payrollDay: z.coerce.number().min(1).max(31).default(25),
   signatoryName: z.string().optional().or(z.literal('')),
   signatoryTitle: z.string().optional().or(z.literal('')),
 })
 
+// Helper function to initialize roles and permissions (outside transaction)
+async function initializeRolesAndPermissions() {
+  // Check if roles already exist
+  const existingRoles = await prisma.role.count()
+  if (existingRoles > 0) {
+    return await prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } })
+  }
+
+  // Create roles
+  const roles = await prisma.role.createMany({
+    data: [
+      {
+        name: 'SUPER_ADMIN',
+        displayName: 'Super Administrator',
+        description: 'Full system access',
+        level: 1,
+      },
+      {
+        name: 'PAYROLL_MANAGER',
+        displayName: 'Payroll Manager',
+        description: 'Manage payroll operations',
+        level: 2,
+      },
+      {
+        name: 'HR_MANAGER',
+        displayName: 'HR Manager',
+        description: 'Manage employees and HR operations',
+        level: 3,
+      },
+      {
+        name: 'VIEWER',
+        displayName: 'Viewer',
+        description: 'View-only access',
+        level: 4,
+      }
+    ]
+  })
+
+  // Create permissions
+  await prisma.permission.createMany({
+    data: [
+      // Employee permissions
+      { resource: 'employees', action: 'read', scope: 'all' },
+      { resource: 'employees', action: 'write', scope: 'all' },
+      { resource: 'employees', action: 'delete', scope: 'all' },
+      
+      // Payroll permissions
+      { resource: 'payroll', action: 'read', scope: 'all' },
+      { resource: 'payroll', action: 'write', scope: 'all' },
+      { resource: 'payroll', action: 'process', scope: 'all' },
+      { resource: 'payroll', action: 'approve', scope: 'all' },
+      
+      // Reports permissions
+      { resource: 'reports', action: 'read', scope: 'all' },
+      { resource: 'reports', action: 'download', scope: 'all' },
+      
+      // Settings permissions
+      { resource: 'settings', action: 'read', scope: 'all' },
+      { resource: 'settings', action: 'write', scope: 'all' },
+    ]
+  })
+
+  // Get the Super Admin role
+  const superAdminRole = await prisma.role.findUnique({
+    where: { name: 'SUPER_ADMIN' }
+  })
+
+  // Assign all permissions to Super Admin
+  const allPermissions = await prisma.permission.findMany()
+  await prisma.rolePermission.createMany({
+    data: allPermissions.map(p => ({
+      roleId: superAdminRole!.id,
+      permissionId: p.id,
+    })),
+    skipDuplicates: true,
+  })
+
+  return superAdminRole
+}
+
 export async function POST(req: Request) {
   try {
-    
     const session = await getServerSession(authOptions)
-    
     
     if (!session) {
       return Response.json({ error: 'No session found. Please sign in again.' }, { status: 401 })
@@ -61,13 +139,11 @@ export async function POST(req: Request) {
       }, { status: 401 })
     }
     
-    
     // Check if already onboarded
     const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     })
     
- 
     if (!user) {
       return Response.json({ error: 'User not found in database' }, { status: 404 })
     }
@@ -91,156 +167,90 @@ export async function POST(req: Request) {
         error: 'A company with this KRA PIN already exists' 
       }, { status: 400 })
     }
+
+    // Initialize roles and permissions OUTSIDE the transaction
+    console.log('Initializing roles and permissions...')
+    const superAdminRole = await initializeRolesAndPermissions()
     
+    if (!superAdminRole) {
+      throw new Error('Failed to initialize Super Admin role')
+    }
     
-    // Create company and update user in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Create company
-      const company = await tx.company.create({
-        data: {
-          companyName: validatedData.companyName,
-          email: validatedData.email,
-          phone: validatedData.phone || undefined,
-          businessRegNo: validatedData.businessRegNo || undefined,
-          kraPin: validatedData.kraPin.toUpperCase(),
-          nssfNumber: validatedData.nssfNumber || undefined,
-          nhifNumber: validatedData.nhifNumber || undefined,
-          shifNumber: validatedData.shifNumber || undefined,
-          housingLevy: validatedData.housingLevy || undefined,
-          physicalAddress: validatedData.physicalAddress,
-          postalAddress: validatedData.postalAddress || undefined,
-          city: validatedData.city,
-          county: validatedData.county,
-          bankName: validatedData.bankName || undefined,
-          bankBranch: validatedData.bankBranch || undefined,
-          bankAccount: validatedData.bankAccount || undefined,
-          swiftCode: validatedData.swiftCode || undefined,
-          payrollDay: validatedData.payrollDay,
-          signatoryName: validatedData.signatoryName || undefined,
-          signatoryTitle: validatedData.signatoryTitle || undefined,
-          createdBy: session.user.id,
-        },
-      })
-      
-      
-      // Update user to mark onboarding complete
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: {
-          hasCompletedOnboarding: true,
-          onboardingCompletedAt: new Date(),
-          companyId: company.id,
-        },
-      })
-      
-      
-      // Get or create Super Admin role
-      let superAdminRole = await tx.role.findUnique({
-        where: { name: 'SUPER_ADMIN' }
-      })
-      
-      if (!superAdminRole) {
-        
-        // Create default roles if they don't exist
-        superAdminRole = await tx.role.create({
+    // Now do a FAST transaction with just company creation and user updates
+    console.log('Creating company and updating user...')
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Create company
+        const company = await tx.company.create({
           data: {
-            name: 'SUPER_ADMIN',
-            displayName: 'Super Administrator',
-            description: 'Full system access',
-            level: 1,
-          }
-        })
-
-        // Create other default roles
-        await tx.role.createMany({
-          data: [
-            {
-              name: 'PAYROLL_MANAGER',
-              displayName: 'Payroll Manager',
-              description: 'Manage payroll operations',
-              level: 2,
-            },
-            {
-              name: 'HR_MANAGER',
-              displayName: 'HR Manager',
-              description: 'Manage employees and HR operations',
-              level: 3,
-            },
-            {
-              name: 'VIEWER',
-              displayName: 'Viewer',
-              description: 'View-only access',
-              level: 4,
-            }
-          ]
-        })
-
-        // Create default permissions
-        await tx.permission.createMany({
-          data: [
-            // Employee permissions
-            { resource: 'employees', action: 'read', scope: 'all' },
-            { resource: 'employees', action: 'write', scope: 'all' },
-            { resource: 'employees', action: 'delete', scope: 'all' },
-            
-            // Payroll permissions
-            { resource: 'payroll', action: 'read', scope: 'all' },
-            { resource: 'payroll', action: 'write', scope: 'all' },
-            { resource: 'payroll', action: 'process', scope: 'all' },
-            { resource: 'payroll', action: 'approve', scope: 'all' },
-            
-            // Reports permissions
-            { resource: 'reports', action: 'read', scope: 'all' },
-            { resource: 'reports', action: 'download', scope: 'all' },
-            
-            // Settings permissions
-            { resource: 'settings', action: 'read', scope: 'all' },
-            { resource: 'settings', action: 'write', scope: 'all' },
-          ]
-        })
-
-        // Assign all permissions to SUPER_ADMIN
-        const allPermissions = await tx.permission.findMany()
-        await tx.rolePermission.createMany({
-          data: allPermissions.map(p => ({
-            roleId: superAdminRole!.id,
-            permissionId: p.id,
-          }))
+            companyName: validatedData.companyName,
+            email: validatedData.email,
+            phone: validatedData.phone || undefined,
+            businessRegNo: validatedData.businessRegNo || undefined,
+            kraPin: validatedData.kraPin.toUpperCase(),
+            nssfNumber: validatedData.nssfNumber || undefined,
+            nhifNumber: validatedData.nhifNumber || undefined,
+            shifNumber: validatedData.shifNumber || undefined,
+            housingLevy: validatedData.housingLevy || undefined,
+            physicalAddress: validatedData.physicalAddress,
+            postalAddress: validatedData.postalAddress || undefined,
+            city: validatedData.city,
+            county: validatedData.county,
+            bankName: validatedData.bankName || undefined,
+            bankBranch: validatedData.bankBranch || undefined,
+            bankAccount: validatedData.bankAccount || undefined,
+            swiftCode: validatedData.swiftCode || undefined,
+            payrollDay: validatedData.payrollDay,
+            signatoryName: validatedData.signatoryName || undefined,
+            signatoryTitle: validatedData.signatoryTitle || undefined,
+            createdBy: session.user.id,
+          },
         })
         
-      }
-      
-      // Assign Super Admin role to first user
-      await tx.userRole.create({
-        data: {
-          userId: session.user.id,
-          roleId: superAdminRole.id,
-          assignedBy: session.user.id,
-        },
-      })
-      
-      
-      // Log audit trail
-      await tx.auditLog.create({
-        data: {
-          action: 'COMPLETE_ONBOARDING',
-          entityType: 'Company',
-          entityId: company.id,
-          userId: session.user.id,
-          userEmail: session.user.email || '',
-          newValues: {
+        // Update user to mark onboarding complete
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: {
+            hasCompletedOnboarding: true,
+            onboardingCompletedAt: new Date(),
             companyId: company.id,
-            companyName: company.companyName,
-            kraPin: company.kraPin,
-            timestamp: new Date().toISOString(),
           },
-        },
-      })
-      
-      
-      return { company, superAdminRole }
-    })
+        })
+        
+        // Assign Super Admin role to user
+        await tx.userRole.create({
+          data: {
+            userId: session.user.id,
+            roleId: superAdminRole.id,
+            assignedBy: session.user.id,
+          },
+        })
+        
+        // Log audit trail
+        await tx.auditLog.create({
+          data: {
+            action: 'COMPLETE_ONBOARDING',
+            entityType: 'Company',
+            entityId: company.id,
+            userId: session.user.id,
+            userEmail: session.user.email || '',
+            newValues: {
+              companyId: company.id,
+              companyName: company.companyName,
+              kraPin: company.kraPin,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        })
+        
+        return { company }
+      },
+      {
+        timeout: 10000, // 10 seconds timeout (increased from default 5s)
+      }
+    )
     
+    console.log('✅ Onboarding completed successfully')
     
     return Response.json({
       success: true,
