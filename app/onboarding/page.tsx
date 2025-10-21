@@ -513,7 +513,7 @@ export default function OnboardingPage() {
             Welcome to Karimba, your payroll assistant
           </h1>
           <p className="text-gray-600">
-            Let's set up your company profile in just a few steps
+            Let&#39;s set up your company profile in just a few steps
           </p>
         </div>
 
