@@ -22,7 +22,7 @@ export default function EditEmployeePage() {
   const router = useRouter()
   const params = useParams()
   const employeeId = params.id as string
-  const { toast } = useToast()
+  const { showToast } = useToast()
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -70,11 +70,7 @@ export default function EditEmployeePage() {
         }
       } catch (error) {
         console.error('Error loading employee:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to load employee details',
-          variant: 'destructive',
-        })
+        showToast('Failed to load employee details', 'error')
       } finally {
         setIsLoading(false)
       }
@@ -83,7 +79,7 @@ export default function EditEmployeePage() {
     if (employeeId) {
       loadEmployee()
     }
-  }, [employeeId, toast])
+  }, [employeeId, showToast])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -134,19 +130,12 @@ export default function EditEmployeePage() {
         throw new Error(result.error || 'Failed to update employee')
       }
 
-      toast({
-        title: 'Success',
-        description: 'Employee updated successfully',
-      })
+      showToast('Employee updated successfully', 'success')
 
       router.push(`/employees/${employeeId}`)
     } catch (error) {
       console.error('Error updating employee:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update employee',
-        variant: 'destructive',
-      })
+      showToast(error instanceof Error ? error.message : 'Failed to update employee', 'error')
     } finally {
       setIsSaving(false)
     }

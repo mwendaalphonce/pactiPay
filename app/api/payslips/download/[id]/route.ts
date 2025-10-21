@@ -1,7 +1,8 @@
 // src/app/api/payslips/download/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generatePayslipPDF } from '@/pdf/payslip-generator'
+import { generatePayslipPDF } from '@/lib/pdf-generator'
+import { PayslipData } from '@/types'
 
 // GET /api/payslips/download/[id] - Download payslip as PDF
 export async function GET(
@@ -12,7 +13,11 @@ export async function GET(
     const payroll = await prisma.payrollRun.findUnique({
       where: { id: params.id },
       include: {
-        employee: true
+        employee: {
+          include: {
+            company: true
+          }
+        }
       }
     })
     
@@ -21,6 +26,16 @@ export async function GET(
         { 
           success: false, 
           error: 'Payslip not found' 
+        },
+        { status: 404 }
+      )
+    }
+
+    if (!payroll.employee.company) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Company information not found' 
         },
         { status: 404 }
       )
@@ -62,47 +77,77 @@ export async function GET(
       }
     )
     
-    // Prepare payslip data
-    const payslipData = {
+    // Prepare payslip data matching PayslipData interface
+    const payslipData: PayslipData = {
+      company: {
+        id: payroll.employee.company.id,
+        name: payroll.employee.company.companyName,
+        address: payroll.employee.company.physicalAddress ?? undefined,
+        phone: payroll.employee.company.phone ?? undefined,
+        email: payroll.employee.company.email,
+        kraPin: payroll.employee.company.kraPin ?? undefined,
+        logo: payroll.employee.company.logo ?? undefined,
+        signatoryName: payroll.employee.company.signatoryName ?? undefined,
+        signatoryTitle: payroll.employee.company.signatoryTitle ?? undefined,
+        signatorySignature: payroll.employee.company.signatorySignature ?? undefined
+      },
       employee: {
+        id: payroll.employee.id,
         name: payroll.employee.name,
         kraPin: payroll.employee.kraPin,
-        employeeNumber: payroll.employee.employeeNumber,
         nationalId: payroll.employee.nationalId,
-        bankName: payroll.employee.bankName,
-        bankBranch: payroll.employee.bankBranch,
-        bankAccount: payroll.employee.bankAccount,
-        contractType: payroll.employee.contractType
+        employeeNumber: payroll.employee.employeeNumber ?? undefined,
+        email: payroll.employee.email ?? undefined,
+        phone: payroll.employee.phoneNumber ?? undefined,
+        bankName: payroll.employee.bankName ?? undefined,
+        bankAccount: payroll.employee.bankAccount ?? undefined
       },
-      payPeriod: {
-        month: new Date(payroll.monthYear + '-01').toLocaleString('en-US', { month: 'long' }),
-        year: new Date(payroll.monthYear + '-01').getFullYear(),
-        monthYear: payroll.monthYear
+      payroll: {
+        id: payroll.id,
+        monthYear: payroll.monthYear,
+        payPeriod: new Date(payroll.monthYear + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+        payDate: payroll.processedAt.toISOString(),
+        processedDate: payroll.processedAt.toISOString(),
+        status: payroll.status
       },
       earnings: {
         basicSalary: payroll.basicSalary,
         allowances: payroll.allowances,
         overtime: payroll.overtime,
+        overtimeHours: payroll.overtimeHours,
         bonuses: payroll.bonuses,
+        bonusDescription: payroll.bonusDescription ?? undefined,
         grossPay: payroll.grossPay
       },
       deductions: {
-        paye: payroll.paye,
         nssf: payroll.nssf,
         shif: payroll.shif,
         housingLevy: payroll.housingLevy,
+        totalAllowable: payroll.nssf + payroll.shif + payroll.housingLevy,
+        taxableIncome: payroll.taxableIncome,
+        grossTax: payroll.paye + (payroll.deductions as any)?.personalRelief || 2400,
+        personalRelief: (payroll.deductions as any)?.personalRelief || 2400,
+        insuranceRelief: (payroll.deductions as any)?.insuranceRelief || 0,
+        paye: payroll.paye,
         customDeductions: payroll.customDeductions,
-        totalStatutory: payroll.paye + payroll.nssf + payroll.shif + payroll.housingLevy,
+        customDeductionDescription: undefined,
         totalDeductions: payroll.totalDeductions
       },
       netPay: payroll.netPay,
-      ytdTotals,
       employerContributions: {
-        nssf: payroll.nssf, // Employer matches employee contribution
-        housingLevy: payroll.housingLevy * 0.5 // Employer pays 1.5%, employee pays 1.5%
+        nssf: payroll.nssf,
+        shif: payroll.shif,
+        housingLevy: payroll.housingLevy * 0.5,
+        total: payroll.nssf + payroll.shif + (payroll.housingLevy * 0.5)
       },
-      processedDate: payroll.createdAt,
-      generatedDate: new Date()
+      additionalInfo: {
+        unpaidDays: payroll.unpaidDays || undefined,
+        unpaidDeduction: payroll.unpaidDeduction || undefined,
+        effectiveTaxRate: (payroll.calculations as any)?.effectiveTaxRate,
+        ytdGrossPay: ytdTotals.grossPay,
+        ytdNetPay: ytdTotals.netPay,
+        ytdPaye: ytdTotals.paye
+      }
     }
     
     // Generate PDF buffer
@@ -111,8 +156,8 @@ export async function GET(
     // Create filename
     const fileName = `payslip_${payroll.employee.name.replace(/\s+/g, '_')}_${payroll.monthYear}.pdf`
     
-    // Return PDF as downloadable file
-    return new NextResponse(pdfBuffer, {
+    // Return PDF as downloadable file - convert Buffer to Uint8Array
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
@@ -142,7 +187,11 @@ export async function POST(
     const payroll = await prisma.payrollRun.findUnique({
       where: { id: params.id },
       include: {
-        employee: true
+        employee: {
+          include: {
+            company: true
+          }
+        }
       }
     })
     
@@ -184,6 +233,7 @@ export async function POST(
     )
     
     const payslipPreview = {
+      company: payroll.employee.company,
       employee: payroll.employee,
       payPeriod: {
         month: new Date(payroll.monthYear + '-01').toLocaleString('en-US', { month: 'long' }),

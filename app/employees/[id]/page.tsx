@@ -2,13 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Edit, ArrowLeft, User, Briefcase, DollarSign, Calendar, CreditCard, Home, TrendingUp, Shield } from 'lucide-react';
+import { Employee } from '@/types';
+
+interface EmployeeWithRelations extends Employee {
+  payrollRuns?: any[];
+  salaryAdjustments?: any[];
+  deductions?: any[];
+  bonuses?: any[];
+  insurancePremiums?: any[];
+}
 
 export default function EmployeeDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const [employee, setEmployee] = useState(null);
+  const [employee, setEmployee] = useState<EmployeeWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEmployee();
@@ -32,14 +41,15 @@ export default function EmployeeDetailsPage() {
     }
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount?: number | null) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
       currency: 'KES',
     }).format(amount || 0);
   };
 
-  const formatDate = (date) => {
+  const formatDate = (date?: string | Date) => {
+    if (!date) return '—';
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -83,7 +93,6 @@ export default function EmployeeDetailsPage() {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-        
         </div>
 
         {/* Employee Header */}
@@ -160,11 +169,11 @@ export default function EmployeeDetailsPage() {
 
           {/* Related Records */}
           <Section icon={<TrendingUp className="w-5 h-5" />} title="Related Records">
-            <Field label="Payroll Runs" value={employee.payrollRuns?.length || 0} />
-            <Field label="Salary Adjustments" value={employee.salaryAdjustments?.length || 0} />
-            <Field label="Active Deductions" value={employee.deductions?.length || 0} />
-            <Field label="Pending Bonuses" value={employee.bonuses?.length || 0} />
-            <Field label="Insurance Premiums" value={employee.insurancePremiums?.length || 0} />
+            <Field label="Payroll Runs" value={String(employee.payrollRuns?.length || 0)} />
+            <Field label="Salary Adjustments" value={String(employee.salaryAdjustments?.length || 0)} />
+            <Field label="Active Deductions" value={String(employee.deductions?.length || 0)} />
+            <Field label="Pending Bonuses" value={String(employee.bonuses?.length || 0)} />
+            <Field label="Insurance Premiums" value={String(employee.insurancePremiums?.length || 0)} />
           </Section>
 
           {/* Timestamps */}
@@ -179,7 +188,13 @@ export default function EmployeeDetailsPage() {
   );
 }
 
-function Section({ icon, title, children }) {
+interface SectionProps {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}
+
+function Section({ icon, title, children }: SectionProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
@@ -193,7 +208,12 @@ function Section({ icon, title, children }) {
   );
 }
 
-function Field({ label, value }) {
+interface FieldProps {
+  label: string;
+  value?: string | number | null;
+}
+
+function Field({ label, value }: FieldProps) {
   return (
     <div className="flex justify-between items-start gap-4">
       <span className="text-sm text-slate-500">{label}</span>
