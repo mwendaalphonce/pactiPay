@@ -15,7 +15,7 @@ import { WORKING_TIME } from '@/lib/constants/kenya-tax-rates'
  * 1. Calculate Gross Pay
  * 2. Deduct NSSF (allowable deduction)
  * 3. Deduct SHIF (NEW: now allowable deduction)
- * 4. Deduct Housing Levy (NEW: now allowable deduction)
+ * 4. Deduct Housing Levy (NEW: now allowable deduction)P
  * 5. Calculate PAYE on remaining amount
  * 6. Apply tax reliefs (Personal, Insurance)ayro
  * 7. Calculate Net Pay
