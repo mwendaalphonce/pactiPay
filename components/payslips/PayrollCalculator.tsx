@@ -23,6 +23,7 @@ import {
   type PayrollInput,
   type PayrollCalculationResult 
 } from '@/lib/payroll/calculations'
+import { convertInsurancePremiumsToReliefInput } from '@/lib/payroll/insurance-utils'
 
 interface PayrollCalculatorProps {
   employees: Employee[]
@@ -49,11 +50,11 @@ export default function PayrollCalculator({
     return `${year}-${month}`
   }
 
-  // Form state
+  // Form state - ✅ FIX: Use uppercase for overtimeType
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialEmployeeId || '')
   const [monthYear, setMonthYear] = useState(initialMonthYear || getCurrentMonthYear())
   const [overtimeHours, setOvertimeHours] = useState<number>(0)
-  const [overtimeType, setOvertimeType] = useState<'weekday' | 'holiday'>('weekday')
+  const [overtimeType, setOvertimeType] = useState<'WEEKDAY' | 'HOLIDAY'>('WEEKDAY')
   const [unpaidDays, setUnpaidDays] = useState<number>(0)
   const [customDeductions, setCustomDeductions] = useState<number>(0)
   const [customDeductionDescription, setCustomDeductionDescription] = useState('')
@@ -97,9 +98,9 @@ export default function PayrollCalculator({
         kraPin: selectedEmployee.kraPin,
         basicSalary: selectedEmployee.basicSalary,
         allowances: selectedEmployee.allowances,
-        contractType: selectedEmployee.contractType || 'permanent',
-        isDisabled: selectedEmployee.isDisabled,
-        insurancePremiums: selectedEmployee.insurancePremiums
+        contractType: selectedEmployee.contractType,
+        isDisabled: selectedEmployee.isDisabled || false,
+        insurancePremiums: convertInsurancePremiumsToReliefInput(selectedEmployee.insurancePremiums) // ✅ FIX: Convert array to relief input
       },
       overtimeHours: overtimeHours || 0,
       overtimeType: overtimeType,
@@ -159,7 +160,7 @@ export default function PayrollCalculator({
 
   const handleReset = () => {
     setOvertimeHours(0)
-    setOvertimeType('weekday')
+    setOvertimeType('WEEKDAY')
     setUnpaidDays(0)
     setCustomDeductions(0)
     setCustomDeductionDescription('')
@@ -271,7 +272,7 @@ export default function PayrollCalculator({
               />
             </div>
 
-            {/* Overtime */}
+            {/* Overtime - ✅ FIX: Use uppercase values */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="overtimeHours">Overtime Hours</Label>
@@ -287,13 +288,13 @@ export default function PayrollCalculator({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="overtimeType">Overtime Type</Label>
-                <Select value={overtimeType} onValueChange={(val: 'weekday' | 'holiday') => setOvertimeType(val)}>
+                <Select value={overtimeType} onValueChange={(val: 'WEEKDAY' | 'HOLIDAY') => setOvertimeType(val)}>
                   <SelectTrigger id="overtimeType">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="weekday">Weekday (1.5x)</SelectItem>
-                    <SelectItem value="holiday">Holiday/Weekend (2.0x)</SelectItem>
+                    <SelectItem value="WEEKDAY">Weekday (1.5x)</SelectItem>
+                    <SelectItem value="HOLIDAY">Holiday/Weekend (2.0x)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -15,20 +15,31 @@ export interface Employee {
   basicSalary: number
   allowances: number
   startDate: string 
-  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL' | 'INTERN' // ✅ FIX: Uppercase to match Prisma
+  contractType: 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN' // ✅ FIX: Remove TEMPORARY - not in Prisma
   isActive: boolean
   residentialStatus: 'RESIDENT' | 'NON_RESIDENT'
   employeeType: 'PRIMARY' | 'SECONDARY'
+  
+  // ✅ ADD: Missing fields
+  isDisabled?: boolean // For disability tax exemption
+  insurancePremiums?: InsurancePremium[] // ✅ From database - array of premium records
+  
+  // Allowances breakdown
   housingAllowance?: number
   transportAllowance?: number
   leavePay?: number
   otherAllowances?: number
+  
+  // Pension
   pensionScheme: boolean
   pensionSchemeNo?: string
+  
+  // Housing benefits
   housingBenefit: 'NOT_PROVIDED' | 'EMPLOYER_OWNED' | 'EMPLOYER_RENTED' | 'AGRICULTURE_FARM'
   valueOfQuarters?: number
   actualRent?: number
   ownerOccupierInterest?: number
+  
   createdAt: string 
   updatedAt: string
 }
@@ -50,9 +61,10 @@ export interface EmployeeFormData {
   basicSalary: number
   allowances: number
   startDate: string
-  contractType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'CASUAL' | 'INTERN' // ✅ FIX: Uppercase
+  contractType: 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN' // ✅ FIX: Remove TEMPORARY
   residentialStatus?: 'RESIDENT' | 'NON_RESIDENT'
   employeeType?: 'PRIMARY' | 'SECONDARY'
+  isDisabled?: boolean // ✅ ADD
   housingAllowance?: number
   transportAllowance?: number
   leavePay?: number
@@ -65,11 +77,30 @@ export interface EmployeeFormData {
   ownerOccupierInterest?: number
 }
 
-export interface InsurancePremium {
-  id?: string
+// ✅ ADD: Insurance Relief Input (for tax calculations)
+// This matches what the payroll calculations expect
+export interface InsuranceReliefInput {
   lifeInsurance?: number
   educationPolicy?: number
   healthInsurance?: number
+}
+
+export interface InsurancePremium {
+  id?: string
+  employeeId?: string
+  insuranceType?: string
+  provider?: string
+  policyNumber?: string
+  monthlyPremium?: number
+  employeeShare?: number
+  employerShare?: number
+  lifeInsurance?: number
+  educationPolicy?: number
+  healthInsurance?: number
+  startDate?: string
+  endDate?: string
+  isActive?: boolean
+  isTaxRelief?: boolean
 }
 
 export interface PayrollRun {
@@ -85,9 +116,9 @@ export interface PayrollRun {
   bonuses: number
   grossPay: number
   
-  // Overtime Details
+  // Overtime Details - ✅ FIX: Uppercase to match Prisma
   overtimeHours: number
-  overtimeType: 'WEEKDAY' | 'HOLIDAY' // ✅ FIX: Uppercase to match Prisma
+  overtimeType: 'WEEKDAY' | 'HOLIDAY'
   
   // Bonus Details
   bonusDescription?: string
@@ -130,11 +161,12 @@ export interface PayrollDeductions {
   nssf: number
   shif: number
   housingLevy: number
-  taxableIncome: number // ✅ Added - was missing
+  taxableIncome: number
   customDeductions: number
   customDeductionDescription?: string
   totalStatutory: number
   totalDeductions: number
+  totalAllowableDeductions?: number // ✅ ADD for Dec 2024 tax law
   // Additional breakdown
   personalRelief?: number
   insuranceRelief?: number
@@ -155,7 +187,7 @@ export interface PayrollCalculations {
   hourlyRate: number
   unpaidDeduction: number
   effectiveTaxRate: number
-  taxableIncome?: number // ✅ Added for clarity
+  taxableIncome?: number
   // Employer contributions
   nssfEmployer?: number
   shifEmployer?: number
@@ -272,5 +304,56 @@ export interface PaginatedResponse<T> {
     limit: number
     total: number
     totalPages: number
+  }
+}
+
+// Auth-related types
+export interface Company {
+  id: string
+  companyName: string
+  email: string
+  logo?: string | null
+  isActive: boolean
+  plan: string
+  suspendedAt?: Date | null
+  suspensionReason?: string | null
+}
+
+export interface Permission {
+  resource: string
+  action: string
+  scope?: string | null
+}
+
+// NextAuth type augmentation
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string
+      name?: string | null
+      email?: string | null
+      image?: string | null
+      hasCompletedOnboarding: boolean
+      companyId?: string | null
+      company?: Company | null
+      roles?: string[]
+      permissions?: Permission[]
+    }
+  }
+  
+  interface User {
+    hasCompletedOnboarding?: boolean
+    companyId?: string | null
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string
+    hasCompletedOnboarding: boolean
+    companyId?: string | null
+    company?: Company | null
+    roles?: string[]
+    permissions?: Permission[]
   }
 }

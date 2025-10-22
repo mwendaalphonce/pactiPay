@@ -1,10 +1,16 @@
 // src/lib/payroll/calculations.ts
 
-import { calculateMonthlyPAYE, getPAYEBreakdown, InsuranceReliefInput } from './paye'
+import { getPAYEBreakdown, InsuranceReliefInput } from './paye'
 import { calculateNSSF } from './nssf'
 import { calculateSHIF } from './shif'
 import { calculateHousingLevy } from './housing-levy'
 import { WORKING_TIME } from '@/lib/constants/kenya-tax-rates'
+
+// Import actual types from their respective modules
+import type { PayeCalculationResult } from './paye'
+import type { NSSFCalculationResult } from './nssf'
+import type { SHIFCalculationResult } from './shif'
+import type { HousingLevyCalculationResult } from './housing-levy'
 
 /**
  * Core Payroll Calculation Engine for Kenya 2025
@@ -15,9 +21,9 @@ import { WORKING_TIME } from '@/lib/constants/kenya-tax-rates'
  * 1. Calculate Gross Pay
  * 2. Deduct NSSF (allowable deduction)
  * 3. Deduct SHIF (NEW: now allowable deduction)
- * 4. Deduct Housing Levy (NEW: now allowable deduction)P
+ * 4. Deduct Housing Levy (NEW: now allowable deduction)
  * 5. Calculate PAYE on remaining amount
- * 6. Apply tax reliefs (Personal, Insurance)ayro
+ * 6. Apply tax reliefs (Personal, Insurance)
  * 7. Calculate Net Pay
  */
 
@@ -27,7 +33,7 @@ export interface Employee {
   kraPin: string
   basicSalary: number
   allowances: number
-  contractType: 'permanent' | 'contract' | 'casual' | 'intern'
+  contractType: 'PERMANENT' | 'CONTRACT' | 'CASUAL' | 'INTERN'
   isDisabled?: boolean
   insurancePremiums?: InsuranceReliefInput
 }
@@ -40,6 +46,12 @@ export interface PayrollInput {
   customDeductions: number
   bonuses: number
 }
+
+// Use actual types from imported modules
+export type PAYEBreakdownResult = PayeCalculationResult
+export type NSSFBreakdownResult = NSSFCalculationResult
+export type SHIFBreakdownResult = SHIFCalculationResult
+export type HousingLevyBreakdownResult = HousingLevyCalculationResult
 
 export interface PayrollCalculationResult {
   employee: {
@@ -82,7 +94,7 @@ export interface PayrollCalculationResult {
     total: number
   }
   calculations: {
-    taxableIncome: any
+    taxableIncome: number
     workingDays: number
     dailyRate: number
     hourlyRate: number
@@ -90,10 +102,10 @@ export interface PayrollCalculationResult {
     effectiveTaxRate: number
   }
   breakdown: {
-    payeBreakdown: any
-    nssfBreakdown: any
-    shifBreakdown: any
-    housingLevyBreakdown: any
+    payeBreakdown: PAYEBreakdownResult
+    nssfBreakdown: NSSFBreakdownResult
+    shifBreakdown: SHIFBreakdownResult
+    housingLevyBreakdown: HousingLevyBreakdownResult
   }
 }
 
@@ -212,7 +224,7 @@ export function calculatePayroll(input: PayrollInput): PayrollCalculationResult 
     },
     calculations: {
       workingDays,
-      taxableIncome,
+      taxableIncome: Math.round(taxableIncome * 100) / 100,
       dailyRate: Math.round(dailyRate * 100) / 100,
       hourlyRate: Math.round(hourlyRate * 100) / 100,
       unpaidDeduction: Math.round(unpaidDeduction * 100) / 100,
@@ -539,7 +551,7 @@ export const EXAMPLE_CALCULATIONS = {
     },
     input: {
       overtimeHours: 10,
-      overtimeType: 'weekday' as const,
+      overtimeType: 'WEEKDAY' as const,
       unpaidDays: 0,
       customDeductions: 2000,
       bonuses: 5000
@@ -561,7 +573,7 @@ export const EXAMPLE_CALCULATIONS = {
     },
     input: {
       overtimeHours: 0,
-      overtimeType: 'weekday' as const,
+      overtimeType: 'WEEKDAY' as const,
       unpaidDays: 0,
       customDeductions: 0,
       bonuses: 0
@@ -580,7 +592,7 @@ export const EXAMPLE_CALCULATIONS = {
     },
     input: {
       overtimeHours: 0,
-      overtimeType: 'weekday' as const,
+      overtimeType: 'WEEKDAY' as const,
       unpaidDays: 0,
       customDeductions: 0,
       bonuses: 0

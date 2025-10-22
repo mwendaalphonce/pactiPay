@@ -4,26 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { parse } from "papaparse";
-
-// P10 Submission Model (add to schema.prisma)
-// model P10Submission {
-//   id           String   @id @default(cuid())
-//   companyId    String
-//   month        Int
-//   year         Int
-//   status       P10Status @default(DRAFT)
-//   csvData      String?
-//   kraReference String?
-//   submittedAt  DateTime?
-//   submittedBy  String?
-//   errors       Json?
-//   createdAt    DateTime @default(now())
-//   updatedAt    DateTime @updatedAt
-//   company      Company  @relation(fields: [companyId], references: [id])
-//   @@unique([companyId, month, year])
-//   @@map("p10_submissions")
-// }
-// enum P10Status { DRAFT, VALIDATED, SUBMITTED, APPROVED, REJECTED @@map("p10_status") }
+import Papa from 'papaparse'
 
 interface P10EmployeeRow {
   "Employee Name": string;

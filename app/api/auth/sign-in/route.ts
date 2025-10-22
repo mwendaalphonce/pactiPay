@@ -61,7 +61,7 @@ export const authOptions: AuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.hasCompletedOnboarding = user.hasCompletedOnboarding as boolean;
-        token.company = user.companyId;
+        token.companyId = user.companyId;
       }
       return token;
     },

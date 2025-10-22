@@ -64,8 +64,8 @@ export function calculatePAYE(
   insurancePremiums?: InsuranceReliefInput,
   isDisabled: boolean = false
 ): PayeCalculationResult {
-  // Apply disability exemption if applicable
-  let adjustedTaxableIncome = Math.max(0, taxableIncome)
+// Apply disability exemption if applicable
+  const adjustedTaxableIncome = Math.max(0, taxableIncome)
   
   if (isDisabled && adjustedTaxableIncome <= DISABILITY_EXEMPTION_MONTHLY) {
     // First KSh 150,000 is exempt for people with disability

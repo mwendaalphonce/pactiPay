@@ -1,12 +1,30 @@
 // src/lib/db-utils.ts
 
-import { prisma, withTransaction, DatabaseError } from './prisma'
+import { prisma } from './prisma'
 import { calculatePayroll, PayrollCalculationResult } from './payroll/calculations'
-import type { Employee, PayrollRun, ContractType, PayrollStatus } from '@prisma/client'
+import type { Employee, PayrollRun, ContractType, PayrollStatus, Prisma } from '@prisma/client'
 
 /**
  * Database utility functions for Kenya Payroll System
  */
+
+// ✅ Custom error class
+export class DatabaseError extends Error {
+  constructor(message: string, public originalError?: Error) {
+    super(message)
+    this.name = 'DatabaseError'
+    if (originalError) {
+      this.stack = originalError.stack
+    }
+  }
+}
+
+// ✅ Transaction wrapper
+export async function withTransaction<T>(
+  callback: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return await prisma.$transaction(callback)
+}
 
 // Employee utilities
 export const employeeUtils = {
@@ -52,11 +70,17 @@ export const employeeUtils = {
 
   /**
    * Check if employee exists by KRA PIN
+   * ✅ FIX: KRA PIN requires companyId for unique constraint
    */
-  async findByKraPin(kraPin: string) {
+  async findByKraPin(companyId: string, kraPin: string) {
     try {
       return await prisma.employee.findUnique({
-        where: { kraPin }
+        where: {
+          companyId_kraPin: {
+            companyId,
+            kraPin
+          }
+        }
       })
     } catch (error) {
       throw new DatabaseError('Failed to find employee by KRA PIN', error as Error)
@@ -64,12 +88,16 @@ export const employeeUtils = {
   },
 
   /**
-   * Get all active employees
+   * Get all active employees for a company
+   * ✅ FIX: Added companyId filter
    */
-  async getActiveEmployees() {
+  async getActiveEmployees(companyId: string) {
     try {
       return await prisma.employee.findMany({
-        where: { isActive: true },
+        where: { 
+          companyId,
+          isActive: true 
+        },
         orderBy: { name: 'asc' }
       })
     } catch (error) {
@@ -163,6 +191,7 @@ export const payrollUtils = {
 
   /**
    * Create payroll run from calculation result
+   * ✅ FIX: Properly serialize JSON fields and add missing fields
    */
   async createPayrollRun(
     employeeId: string,
@@ -191,35 +220,42 @@ export const payrollUtils = {
           nssf: calculationResult.deductions.nssf,
           shif: calculationResult.deductions.shif,
           housingLevy: calculationResult.deductions.housingLevy,
+          taxableIncome: calculationResult.deductions.taxableIncome, // ✅ ADD: Missing field
           customDeductions,
           totalDeductions: calculationResult.deductions.totalDeductions,
           netPay: calculationResult.netPay,
           status: 'PROCESSED',
-          deductions: {
+          // ✅ FIX: Serialize complex objects as JSON using JSON.parse(JSON.stringify())
+          deductions: JSON.parse(JSON.stringify({
             paye: calculationResult.deductions.paye,
             nssf: calculationResult.deductions.nssf,
             shif: calculationResult.deductions.shif,
             housingLevy: calculationResult.deductions.housingLevy,
+            taxableIncome: calculationResult.deductions.taxableIncome,
+            grossTax: calculationResult.deductions.grossTax,
+            personalRelief: calculationResult.deductions.personalRelief,
+            insuranceRelief: calculationResult.deductions.insuranceRelief,
+            totalAllowableDeductions: calculationResult.deductions.totalAllowableDeductions,
             customDeductions: calculationResult.deductions.customDeductions,
             totalStatutory: calculationResult.deductions.totalStatutory,
-            totalDeductions: calculationResult.deductions.totalDeductions,
-            breakdown: calculationResult.breakdown
-          },
-          earnings: {
+            totalDeductions: calculationResult.deductions.totalDeductions
+          })) as Prisma.InputJsonValue,
+          earnings: JSON.parse(JSON.stringify({
             basicSalary: calculationResult.earnings.basicSalary,
             allowances: calculationResult.earnings.allowances,
             overtime: calculationResult.earnings.overtime,
             bonuses: calculationResult.earnings.bonuses,
             grossPay: calculationResult.earnings.grossPay
-          },
-          calculations: {
+          })) as Prisma.InputJsonValue,
+          calculations: JSON.parse(JSON.stringify({
             workingDays: calculationResult.calculations.workingDays,
             dailyRate: calculationResult.calculations.dailyRate,
             hourlyRate: calculationResult.calculations.hourlyRate,
             unpaidDeduction: calculationResult.calculations.unpaidDeduction,
             taxableIncome: calculationResult.calculations.taxableIncome,
+            effectiveTaxRate: calculationResult.calculations.effectiveTaxRate,
             employerContributions: calculationResult.employerContributions
-          }
+          })) as Prisma.InputJsonValue
         },
         include: {
           employee: {
@@ -243,6 +279,7 @@ export const payrollUtils = {
    * Get payroll runs with filters
    */
   async getPayrollRuns(filters: {
+    companyId?: string // ✅ ADD: Company filter
     monthYear?: string
     employeeId?: string
     status?: PayrollStatus
@@ -251,6 +288,7 @@ export const payrollUtils = {
   }) {
     try {
       const {
+        companyId,
         monthYear,
         employeeId,
         status,
@@ -258,11 +296,17 @@ export const payrollUtils = {
         limit = 10
       } = filters
 
-      const where: any = {}
+      const where: Prisma.PayrollRunWhereInput = {}
 
       if (monthYear) where.monthYear = monthYear
       if (employeeId) where.employeeId = employeeId
       if (status) where.status = status
+      // ✅ ADD: Filter by company through employee relation
+      if (companyId) {
+        where.employee = {
+          companyId
+        }
+      }
 
       const skip = (page - 1) * limit
 
@@ -468,8 +512,6 @@ export const auditUtils = {
           action,
           entityType,
           entityId,
-          oldValues: oldValues || null,
-          newValues: newValues || null,
           userId,
           userEmail
         }
@@ -503,13 +545,17 @@ export const auditUtils = {
 export const reportingUtils = {
   /**
    * Get payroll summary for month
+   * ✅ ADD: Company filter
    */
-  async getMonthlyPayrollSummary(monthYear: string) {
+  async getMonthlyPayrollSummary(companyId: string, monthYear: string) {
     try {
       const payrollRuns = await prisma.payrollRun.findMany({
         where: {
           monthYear,
-          status: 'PROCESSED'
+          status: 'PROCESSED',
+          employee: {
+            companyId
+          }
         },
         include: {
           employee: {

@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import type { Company, Permission } from "@/types" // Import from your types file
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -68,7 +69,7 @@ export const authOptions: NextAuthOptions = {
   ],
   
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       try {
         // Log sign-in attempt
         await prisma.auditLog.create({
@@ -200,9 +201,9 @@ export const authOptions: NextAuthOptions = {
         session.user.image = token.picture as string
         session.user.hasCompletedOnboarding = token.hasCompletedOnboarding as boolean
         session.user.companyId = token.companyId as string | null
-        session.user.company = token.company as any
+        session.user.company = token.company as Company | null
         session.user.roles = token.roles as string[] || []
-        session.user.permissions = token.permissions as any[] || []
+        session.user.permissions = token.permissions as Permission[] || []
       }
       
       return session
@@ -244,50 +245,4 @@ export const authOptions: NextAuthOptions = {
   
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
-}
-
-// Type augmentation for NextAuth
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string
-      name?: string | null
-      email?: string | null
-      image?: string | null
-      hasCompletedOnboarding: boolean
-      companyId?: string | null
-      company?: {
-        id: string
-        companyName: string
-        email: string
-        logo?: string | null
-        isActive: boolean
-        plan: string
-        suspendedAt?: Date | null
-        suspensionReason?: string | null
-      } | null
-      roles?: string[]
-      permissions?: Array<{
-        resource: string
-        action: string
-        scope?: string | null
-      }>
-    }
-  }
-  
-  interface User {
-    hasCompletedOnboarding?: boolean
-    companyId?: string | null
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    id: string
-    hasCompletedOnboarding: boolean
-    companyId?: string | null
-    company?: any
-    roles?: string[]
-    permissions?: any[]
-  }
 }
