@@ -26,19 +26,10 @@ export default function RootLayout({
       <body className={`${inter.className} h-full bg-gray-50`}>
 
         <AppProviders>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-          
-          
-
+               
           <div className="flex flex-col min-h-screen">
             {children}
           </div>
-          </ThemeProvider>
         </AppProviders>
       </body>
     </html>
