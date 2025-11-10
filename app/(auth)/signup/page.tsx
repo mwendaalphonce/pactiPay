@@ -193,7 +193,7 @@ export default function SignUpPage() {
           alt='logo'
           
           />
-          <h1 className="text-5xl font-bold text-white ">KARIMBA</h1>
+          <h1 className="text-5xl font-bold text-white ">Pacti</h1>
           <p className="text-xl text-blue-100">Welcome to the future of business management</p>
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function SignUpPage() {
             <div className="flex justify-center mb-2">
               <Image src="/logo.png" alt="logo" height={48} width={48} />
             </div>
-            <h1 className="text-2xl font-bold text-blue-700">KARIMBA</h1>
+            <h1 className="text-2xl font-bold text-blue-700">Pacti</h1>
           </div>
 
           {/* Sign Up Card */}

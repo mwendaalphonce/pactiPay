@@ -510,7 +510,7 @@ export default function OnboardingPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome to Karimba, your payroll assistant
+            Welcome to Pacti, your payroll assistant
           </h1>
           <p className="text-gray-600">
             Let&#39;s set up your company profile in just a few steps

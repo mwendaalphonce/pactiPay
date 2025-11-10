@@ -50,7 +50,7 @@ export default function OnboardingSuccessPage() {
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🎉 Welcome to Karimba, your payroll assistant!
+            🎉 Welcome to Pacti, your payroll assistant!
           </h1>
           <p className="text-gray-600">
             Your company has been successfully set up

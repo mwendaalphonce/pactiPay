@@ -69,7 +69,7 @@ export default function Navigation() {
               width={48}
               />
               <span className="font-bold text-xl text-gray-900">
-                KARIMBA
+                Pacti
               </span>
             </Link>
           </div>
