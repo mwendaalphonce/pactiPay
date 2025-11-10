@@ -133,14 +133,12 @@ function SignInForm() {
             <div className="flex items-center justify-center mb-2">
               <Image src="/logo.png"
               alt="Logo"
-              height= {48}
-              width= {48}
+              height= {72}
+              width= {72}
               />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-blue-700 mb-2  ">
-            Pacti
-          </h1>
+          
           
         </div>
 

@@ -187,13 +187,12 @@ export default function SignUpPage() {
         {/* Content */}
         <div className="text-center relative z-10 items-center justify-center flex flex-col gap-y-4">
           <Image
-          src= '/logowhite.png'
+          src= '/logo.png'
           height={72}
           width={72}
           alt='logo'
           
           />
-          <h1 className="text-5xl font-bold text-white ">Pacti</h1>
           <p className="text-xl text-blue-100">Welcome to the future of business management</p>
         </div>
       </div>
@@ -206,7 +205,6 @@ export default function SignUpPage() {
             <div className="flex justify-center mb-2">
               <Image src="/logo.png" alt="logo" height={48} width={48} />
             </div>
-            <h1 className="text-2xl font-bold text-blue-700">Pacti</h1>
           </div>
 
           {/* Sign Up Card */}
