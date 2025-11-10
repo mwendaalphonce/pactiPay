@@ -68,9 +68,7 @@ export default function Navigation() {
               height={48}
               width={48}
               />
-              <span className="font-bold text-xl text-gray-900">
-                Pacti
-              </span>
+             
             </Link>
           </div>
 
